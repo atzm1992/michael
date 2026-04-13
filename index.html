@@ -259,6 +259,42 @@ tr:hover { background: var(--gruen-l); }
 .stat-box { background: var(--gruen-l); padding: 10px; border-radius: var(--radius); text-align: center; }
 .stat-box .num { font-size: 1.5em; font-weight: bold; color: var(--gruen-d); }
 .stat-box .lbl { font-size: 11px; color: var(--grau); }
+
+/* Plan / Ist / Rest */
+.plan-ist-wrap { grid-column: 1 / -1; margin-top: 4px; }
+.plan-ist-wrap h4 { color: var(--gruen-d); margin: 6px 0; }
+.plan-ist {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.plan-ist th, .plan-ist td {
+  border: 1px solid #ddd;
+  padding: 5px 6px;
+  text-align: center;
+}
+.plan-ist th {
+  background: var(--gruen);
+  color: white;
+  font-weight: 600;
+}
+.plan-ist tr.sum td { background: var(--gruen-l); font-weight: bold; }
+.plan-ist tr.over td { color: var(--rot); font-weight: bold; }
+
+/* Meldeliste im Admin */
+.meld-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.meld-table td {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 6px;
+  vertical-align: middle;
+}
+.meld-table td:first-child { text-align: left; }
+.meld-table td:last-child { text-align: right; }
+
+/* Hervorhebung gemeldeter Einträge */
+.row-gemeldet td { background: #fff8e1 !important; }
+.card-gemeldet { background: #fff8e1; border-left: 4px solid #c62828; }
 </style>
 </head>
 <body>
@@ -488,6 +524,26 @@ tr:hover { background: var(--gruen-l); }
   <button class="sm" onclick="exportExcel()">📊 Export als Excel</button>
  </div>
 
+ <div class="admin-section">
+  <h4>Abschussplan bearbeiten</h4>
+  <div class="admin-row">
+    <label>Jahr:</label>
+    <select id="planYear" onchange="renderPlan()"></select>
+  </div>
+  <div id="planEditor"></div>
+  <button class="sm" onclick="savePlan()">💾 Plan speichern</button>
+ </div>
+
+ <div class="admin-section">
+  <h4>Einträge gemeldet markieren</h4>
+  <p class="hint">Gemeldete Einträge sind gegen Änderungen gesperrt (außer für Admin).</p>
+  <div class="admin-row">
+    <label>Jahr:</label>
+    <select id="meldYear" onchange="renderMeldListe()"></select>
+  </div>
+  <div id="meldListe"></div>
+ </div>
+
   <div style="margin-top:10px;">
     <button class="full" onclick="saveConfig()">💾 Einstellungen speichern</button>
   </div>
@@ -532,12 +588,31 @@ if (!config.mapUrl) config.mapUrl = "https://raw.githubusercontent.com/MichaelUn
 if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
 
 let daten = JSON.parse(localStorage.getItem("daten") || "[]");
+let abschussplan = JSON.parse(localStorage.getItem("abschussplan") || "{}");
 let e = {};
 let aktuellerPunkt = null;
 let mapMode = "input";
 let viewIndex = null;
 let selectedYear = new Date().getFullYear();
 let isAdmin = false;
+
+/* Klassen-Struktur für den Abschussplan */
+const PLAN_KLASSEN = {
+  "Rehwild":  ["T-Bock", "J-Bock", "Geiß", "Schmalgeiß", "Kitz"],
+  "Rotwild":  ["T-Hirsch", "J-Hirsch", "Tier", "Schmaltier", "Kalb"],
+  "Gamswild": ["Bock", "Geiß", "Jährling", "Kitz"]
+};
+
+function getPlan(year) {
+  if (!abschussplan[year]) {
+    abschussplan[year] = {};
+    Object.keys(PLAN_KLASSEN).forEach(art => {
+      abschussplan[year][art] = {};
+      PLAN_KLASSEN[art].forEach(k => { abschussplan[year][art][k] = 0; });
+    });
+  }
+  return abschussplan[year];
+}
 
 /* ---------- Init ---------- */
 function fillExportYears() {
@@ -587,7 +662,10 @@ function applyConfig() {
 }
 
 function saveCfg() { localStorage.setItem("cfg", JSON.stringify(config)); }
-function speichern() { localStorage.setItem("daten", JSON.stringify(daten)); }
+function speichern() {
+  localStorage.setItem("daten", JSON.stringify(daten));
+  localStorage.setItem("abschussplan", JSON.stringify(abschussplan));
+}
 
 /* ---------- Navigation ---------- */
 function zeigeSeite(id) {
@@ -630,7 +708,139 @@ function updateStats() {
   Object.keys(counts).sort().forEach(k => {
     h += `<div class="stat-box"><div class="num">${counts[k]}</div><div class="lbl">${esc(k)}</div></div>`;
   });
+  h += renderPlanIstTabelle(fd, selectedYear);
   document.getElementById("statsContainer").innerHTML = h;
+}
+
+/* Plan vs. Ist vs. Rest als kompakte Tabelle unter den Kacheln */
+function renderPlanIstTabelle(fd, year) {
+  const plan = getPlan(year);
+
+  // Ist-Werte zählen (pro Wildart & Klasse)
+  const ist = {};
+  Object.keys(PLAN_KLASSEN).forEach(art => {
+    ist[art] = {};
+    PLAN_KLASSEN[art].forEach(k => { ist[art][k] = 0; });
+  });
+  fd.forEach(d => {
+    if (PLAN_KLASSEN[d.wildart] && PLAN_KLASSEN[d.wildart].includes(d.wild)) {
+      ist[d.wildart][d.wild]++;
+    }
+  });
+
+  let html = '<div class="plan-ist-wrap"><h4>Abschussplan ' + year + '</h4>';
+  Object.keys(PLAN_KLASSEN).forEach(art => {
+    html += `<table class="plan-ist">
+      <tr><th colspan="4">${art}</th></tr>
+      <tr><th>Klasse</th><th>Plan</th><th>Ist</th><th>Rest</th></tr>`;
+    let sP = 0, sI = 0;
+    PLAN_KLASSEN[art].forEach(k => {
+      const p = plan[art][k] || 0;
+      const iv = ist[art][k] || 0;
+      const rest = p - iv;
+      sP += p; sI += iv;
+      const cls = (rest < 0) ? ' class="over"' : '';
+      html += `<tr${cls}><td>${k}</td><td>${p}</td><td>${iv}</td><td>${rest}</td></tr>`;
+    });
+    html += `<tr class="sum"><td>Summe</td><td>${sP}</td><td>${sI}</td><td>${sP - sI}</td></tr></table>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+/* Plan-Editor im Admin-Panel */
+function fillPlanYears() {
+  const sel = document.getElementById("planYear");
+  if (!sel) return;
+  sel.innerHTML = "";
+  const years = new Set(getYears());
+  Object.keys(abschussplan).forEach(y => years.add(parseInt(y, 10)));
+  years.add(new Date().getFullYear());
+  [...years].sort((a,b) => b - a).forEach(y => {
+    const o = document.createElement("option");
+    o.value = y; o.textContent = y;
+    sel.appendChild(o);
+  });
+  sel.value = selectedYear;
+  renderPlan();
+}
+
+function renderPlan() {
+  const y = parseInt(document.getElementById("planYear").value, 10);
+  const plan = getPlan(y);
+  let html = '<table class="plan-ist">';
+  Object.keys(PLAN_KLASSEN).forEach(art => {
+    html += `<tr><th colspan="2">${art}</th></tr>`;
+    PLAN_KLASSEN[art].forEach(k => {
+      html += `<tr>
+        <td style="text-align:left;">${k}</td>
+        <td><input type="number" min="0" value="${plan[art][k] || 0}"
+             data-art="${art}" data-klasse="${k}" style="width:70px;padding:4px;"></td>
+      </tr>`;
+    });
+  });
+  html += '</table>';
+  document.getElementById("planEditor").innerHTML = html;
+}
+
+function savePlan() {
+  const y = parseInt(document.getElementById("planYear").value, 10);
+  const plan = getPlan(y);
+  document.querySelectorAll("#planEditor input").forEach(inp => {
+    plan[inp.dataset.art][inp.dataset.klasse] = parseInt(inp.value, 10) || 0;
+  });
+  speichern();
+  anzeigen();
+  alert("Abschussplan gespeichert.");
+}
+
+/* ---------- Meldeliste (gemeldet markieren) ---------- */
+function fillMeldYears() {
+  const sel = document.getElementById("meldYear");
+  if (!sel) return;
+  sel.innerHTML = "";
+  getYears().forEach(y => {
+    const o = document.createElement("option");
+    o.value = y; o.textContent = y;
+    sel.appendChild(o);
+  });
+  sel.value = selectedYear;
+  renderMeldListe();
+}
+
+function renderMeldListe() {
+  const y = parseInt(document.getElementById("meldYear").value, 10);
+  const box = document.getElementById("meldListe");
+  const rows = daten
+    .map((d, i) => ({ d, i }))
+    .filter(x => x.d.datum && new Date(x.d.datum).getFullYear() === y);
+  if (!rows.length) {
+    box.innerHTML = '<p class="hint">Keine Einträge in diesem Jahr.</p>';
+    return;
+  }
+  let html = '<table class="meld-table">';
+  rows.forEach(({ d, i }) => {
+    const label = `${formatDatum(d.datum)} · ${esc(d.name||"")} · ${esc(d.wildart||"")} ${esc(d.wild||"")}`.trim();
+    const status = d.gemeldet
+      ? '<span style="color:#c62828;">🔒 gemeldet</span>'
+      : '<span style="color:#2e7d32;">offen</span>';
+    const btnLabel = d.gemeldet ? "Entsperren" : "Sperren";
+    const btnCls = d.gemeldet ? "sm sec" : "sm";
+    html += `<tr>
+      <td>${label}</td>
+      <td>${status}</td>
+      <td><button class="${btnCls}" onclick="toggleGemeldet(${i})">${btnLabel}</button></td>
+    </tr>`;
+  });
+  html += '</table>';
+  box.innerHTML = html;
+}
+
+function toggleGemeldet(i) {
+  daten[i].gemeldet = !daten[i].gemeldet;
+  speichern();
+  renderMeldListe();
+  anzeigen();
 }
 
 /* ---------- Workflow ---------- */
@@ -727,13 +937,21 @@ function editFromSummary() {
 }
 
 function finishSave() {
-  e.entnommen = ""; e.abfall = null;
+  e.entnommen = ""; e.abfall = null; e.gemeldet = false;
   daten.push(e);
   speichern();
   if (e.datum) selectedYear = new Date(e.datum).getFullYear();
   updateYearTabs(); anzeigen();
   e = {}; aktuellerPunkt = null;
   zeigeSeite("revier");
+}
+
+/* ---------- Gemeldet-Sperre ---------- */
+function istGesperrt(i) {
+  return daten[i] && daten[i].gemeldet === true && !isAdmin;
+}
+function alertGesperrt() {
+  alert("Dieser Eintrag ist als gemeldet gesperrt.\nNur der Admin kann ihn ändern.");
 }
 
 /* ---------- Karte ---------- */
@@ -789,7 +1007,8 @@ function anzeigen() {
   fd.forEach((d,fi) => {
     const ri = realIdx(fi);
     const r = t.insertRow();
-    r.insertCell().innerText = d.name||"";
+    if (d.gemeldet) r.classList.add("row-gemeldet");
+    r.insertCell().innerText = (d.gemeldet ? "🔒 " : "") + (d.name||"");
     r.insertCell().innerText = d.wildart||"";
     r.insertCell().innerText = d.wild||"";
     r.insertCell().innerText = d.gewicht||"";
@@ -833,8 +1052,8 @@ function anzeigen() {
   fd.forEach((d,fi) => {
     const ri = realIdx(fi);
     const card = document.createElement("div");
-    card.className = "card";
-    const wt = d.wildart + (d.wild ? " – "+d.wild : "");
+    card.className = "card" + (d.gemeldet ? " card-gemeldet" : "");
+    const wt = (d.gemeldet ? "🔒 " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
     const ortH = (d.ort==="Prad"&&d.koord) ? `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>` : esc(d.ort||"");
 
     let entH = !d.entnommen
@@ -893,9 +1112,13 @@ function pickDate(i) {
   if (el.showPicker) el.showPicker();
   else { el.style.display="block"; el.focus(); }
 }
-function setEntnommen(i,val) { if (val) { daten[i].entnommen=val; speichern(); anzeigen(); } }
+function setEntnommen(i,val) {
+  if (istGesperrt(i)) return alertGesperrt();
+  if (val) { daten[i].entnommen=val; speichern(); anzeigen(); }
+}
 
 function handleAbfall(i) {
+  if (istGesperrt(i)) return alertGesperrt();
   const ov = document.createElement("div"); ov.className="popup-overlay";
   ov.onclick = () => { ov.remove(); box.remove(); };
   const box = document.createElement("div"); box.className="popup";
@@ -916,7 +1139,11 @@ function closePopups() {
 /* ---------- Löschen: NUR Admin ---------- */
 function loeschen(i) {
   if (!isAdmin) return alert("Nur der Admin kann Einträge löschen.");
-  if (!confirm("Eintrag wirklich löschen?")) return;
+  if (daten[i] && daten[i].gemeldet) {
+    if (!confirm("Dieser Eintrag ist als gemeldet markiert. Trotzdem löschen?")) return;
+  } else {
+    if (!confirm("Eintrag wirklich löschen?")) return;
+  }
   daten.splice(i,1); speichern(); updateYearTabs(); anzeigen();
 }
 
@@ -961,6 +1188,13 @@ function openEdit(i) {
         <option value="nein" ${abfV==="nein"?"selected":""}>Nein</option>
       </select>
     </div>
+    <div class="edit-row">
+      <label>Gemeldet (gesperrt)</label>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-weight:normal;">
+        <input id="ed_gem" type="checkbox" ${d.gemeldet ? "checked" : ""} style="width:auto;margin:0;">
+        🔒 als gemeldet sperren
+      </label>
+    </div>
     <div style="margin-top:12px;display:flex;gap:8px;">
       <button onclick="saveEdit(${i})" style="flex:1;">💾 Speichern</button>
       <button class="sec" onclick="closePopups()" style="flex:1;">Abbrechen</button>
@@ -981,6 +1215,7 @@ function saveEdit(i) {
   d.verwendung = document.getElementById("ed_verw").value;
   const a = document.getElementById("ed_abf").value;
   d.abfall = a==="" ? null : a;
+  d.gemeldet = document.getElementById("ed_gem").checked;
   speichern(); closePopups(); updateYearTabs(); anzeigen();
 }
 
@@ -991,7 +1226,9 @@ function showLogin() {
   if (isAdmin) {
     applyConfig();
     zeigeSeite("admin");
-    fillExportYears(); // HIER rein!
+    fillExportYears();
+    fillPlanYears();
+    fillMeldYears();
   } else {
     zeigeSeite("admin-login");
   }
@@ -1000,7 +1237,14 @@ function showLogin() {
 function doLogin() {
   const u = document.getElementById("adminUser").value.trim();
   const p = document.getElementById("adminPass").value;
-  if (u==="admin" && p===config.pass) { isAdmin=true; applyConfig(); zeigeSeite("admin"); }
+  if (u==="admin" && p===config.pass) {
+    isAdmin=true;
+    applyConfig();
+    zeigeSeite("admin");
+    fillExportYears();
+    fillPlanYears();
+    fillMeldYears();
+  }
   else alert("Falsche Zugangsdaten!");
   document.getElementById("adminPass").value = "";
 }
