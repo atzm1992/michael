@@ -1,0 +1,18 @@
+# Credentials / DB config – NIE committen!
+api/config.php
+api/config.local.php
+config.local.*
+.env
+.env.*
+*.secret
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Backups / temp
+*.bak
+*.swp
+*~
