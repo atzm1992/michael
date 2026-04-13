@@ -2,116 +2,169 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Abschussliste</title>
+<title>Abschussliste Jagdrevier Prad</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2e7d32">
 
 <style>
 body {
-  margin:0;
-  font-family: Arial;
-  background:#2e7d32;
-  display:flex;
-  justify-content:center;
-  padding:10px;
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #2e7d32;
+  display: flex;
+  justify-content: center;
+  padding: 10px;
 }
+
 .container {
-  background:white;
-  padding:15px;
-  border-radius:15px;
-  width:100%;
-  max-width:600px;
+  background: white;
+  padding: 15px;
+  border-radius: 15px;
+  width: 100%;
+  max-width: 600px;
 }
-.hidden { display:none; }
+
+.page { display: none; }
+.page.active { display: block; }
 
 .topbar {
-  display:flex;
-  gap:10px;
-  margin-bottom:10px;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
 }
-.topbar button { flex:1; }
+.topbar button { flex: 1; }
 
 button {
-  padding:12px;
-  margin:5px 0;
-  border:none;
-  border-radius:10px;
-  background:#2e7d32;
-  color:white;
-  font-size:16px;
+  padding: 12px;
+  margin: 5px 0;
+  border: none;
+  border-radius: 10px;
+  background: #2e7d32;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
 }
+button:hover { background: #1b5e20; }
+button.secondary { background: #777; }
+button.danger { background: #c62828; }
 
-.table-wrapper { overflow-x:auto; }
+.table-wrapper { overflow-x: auto; }
 
 table {
-  width:100%;
-  border-collapse:collapse;
-  font-size:12px;
-  min-width:950px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 1000px;
 }
 
-th,td {
-  border:1px solid #ccc;
-  padding:5px;
-  text-align:center;
+th, td {
+  border: 1px solid #ccc;
+  padding: 5px;
+  text-align: center;
 }
 
 th {
-  background:#2e7d32;
-  color:white;
+  background: #2e7d32;
+  color: white;
 }
 
 .entnommen-btn {
-  background:red;
-  color:white;
-  border-radius:6px;
-  padding:4px 8px;
-  cursor:pointer;
-  font-weight:bold;
+  background: red;
+  color: white;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-weight: bold;
 }
 
-.entnommen-done { background:#e8f5e9; }
+.entnommen-done { background: #e8f5e9; }
 
 .abfall-btn {
-  background:blue;
-  color:white;
-  border-radius:6px;
-  padding:4px 8px;
-  cursor:pointer;
-  font-weight:bold;
+  background: blue;
+  color: white;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-weight: bold;
 }
 
-.abfall-ja { background:#4caf50; color:white; }
-.abfall-nein { background:#f44336; color:white; }
-.abfall-grau { background:#ccc; }
+.abfall-ja { background: #4caf50; color: white; }
+.abfall-nein { background: #f44336; color: white; }
+
+.del-btn {
+  background: #c62828;
+  color: white;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
 
 input, select {
-  width:100%;
-  padding:10px;
-  margin-top:10px;
-  border-radius:8px;
-  border:1px solid #ccc;
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+  font-size: 16px;
 }
 
 .popup {
-  position:fixed;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  background:white;
-  padding:20px;
-  border-radius:10px;
-  box-shadow:0 0 20px rgba(0,0,0,0.3);
-  z-index:1000;
-  width:320px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  width: 90%;
+  max-width: 360px;
+}
+
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 999;
 }
 
 .marker {
-  position:absolute;
-  width:5px;
-  height:5px;
-  border-radius:50%;
-  transform:translate(-50%,-50%);
-  border:1px solid black;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid black;
+  pointer-events: none;
+}
+
+.marker-legend {
+  font-size: 12px;
+  margin-top: 5px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.marker-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.marker-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid black;
+  display: inline-block;
+}
+
+.hint {
+  font-size: 12px;
+  color: #555;
+  margin: 6px 0;
 }
 </style>
 </head>
@@ -119,463 +172,530 @@ input, select {
 <body>
 <div class="container">
 
-<div id="start">
-<h2>Abschussliste Jagdrevier Prad</h2>
-<div>Zahlencode: 1024</div>
-<img src="491438944_10226782024328158_4391837002889702168_n.jpg" style="width:180px;display:block;margin:auto;">
-<div class="topbar">
-<button onclick="zeigeSeite('park')">Park</button>
-<button onclick="zeigeSeite('revier')">Revier</button>
-</div>
-</div>
-
-<div id="park" class="hidden">
-<h2>Park</h2>
-<p>noch nicht aktiv</p>
-<button onclick="zeigeSeite('start')">⬅ Zurück</button>
-</div>
-
-<div id="revier" class="hidden">
-<div class="topbar">
-<button onclick="zeigeSeite('name')">➕ Neuer Eintrag</button>
-<button onclick="openMapAll()">🗺️ Karte</button>
-<button onclick="zeigeSeite('start')">⬅ Zurück</button>
-</div>
-<div class="table-wrapper">
-<table id="tabelle"></table>
-</div>
+<!-- STARTSEITE -->
+<div id="start" class="page active">
+  <h2>Abschussliste Jagdrevier Prad</h2>
+  <div>Zahlencode: 1024</div>
+  <img src="491438944_10226782024328158_4391837002889702168_n.jpg"
+       alt="Revierlogo"
+       style="width:180px;display:block;margin:auto;"
+       onerror="this.style.display='none'">
+  <div class="topbar">
+    <button onclick="zeigeSeite('park')">Park</button>
+    <button onclick="zeigeSeite('revier')">Revier</button>
+  </div>
+  <div class="topbar">
+    <button class="secondary" onclick="exportJSON()">Export JSON</button>
+    <button class="secondary" onclick="document.getElementById('importFile').click()">Import JSON</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importJSON(event)">
+  </div>
 </div>
 
-<div id="name" class="hidden">
-<h3>Name Erleger</h3>
-<input id="inputName">
-<button onclick="nextWild()">Weiter</button>
-<button onclick="zeigeSeite('revier')">⬅ Zurück</button>
+<!-- PARK -->
+<div id="park" class="page">
+  <h2>Park</h2>
+  <p>noch nicht aktiv</p>
+  <button onclick="zeigeSeite('start')">⬅ Zurück</button>
 </div>
 
-<div id="wild" class="hidden">
-<h3>Wildart</h3>
-<button onclick="zeigeSeite('reh')">Rehwild</button>
-<button onclick="zeigeSeite('hirsch')">Rotwild</button>
-<button onclick="zeigeSeite('gams')">Gamswild</button>
-<button onclick="setWild('Fuchs')">Fuchs</button>
-<button onclick="setWild('Hase')">Hase</button>
-<button onclick="zeigeSeite('andere')">Andere</button>
-<button onclick="zeigeSeite('name')">⬅ Zurück</button>
+<!-- REVIER / TABELLE -->
+<div id="revier" class="page">
+  <div class="topbar">
+    <button onclick="neuerEintrag()">➕ Neuer Eintrag</button>
+    <button onclick="openMapAll()">🗺️ Karte</button>
+    <button onclick="zeigeSeite('start')">⬅ Zurück</button>
+  </div>
+  <div class="table-wrapper">
+    <table id="tabelle"></table>
+  </div>
 </div>
 
-<div id="reh" class="hidden">
-<h3>Rehwild</h3>
-<button onclick="setWildDetail('Rehwild','T-Bock')">T-Bock</button>
-<button onclick="setWildDetail('Rehwild','J-Bock')">J-Bock</button>
-<button onclick="setWildDetail('Rehwild','Geiß')">Geiß</button>
-<button onclick="setWildDetail('Rehwild','Schmalgeiß')">Schmalgeiß</button>
-<button onclick="setWildDetail('Rehwild','Kitz')">Kitz</button>
-<button onclick="zeigeSeite('wild')">⬅ Zurück</button>
+<!-- WORKFLOW: NAME -->
+<div id="name" class="page">
+  <h3>Name Erleger</h3>
+  <input id="inputName" autocomplete="off">
+  <button onclick="nextWild()">Weiter</button>
+  <button class="secondary" onclick="zeigeSeite('revier')">⬅ Zurück</button>
 </div>
 
-<div id="hirsch" class="hidden">
-<h3>Rotwild</h3>
-<button onclick="setWildDetail('Rotwild','T-Hirsch')">T-Hirsch</button>
-<button onclick="setWildDetail('Rotwild','J-Hirsch')">J-Hirsch</button>
-<button onclick="setWildDetail('Rotwild','Tier')">Tier</button>
-<button onclick="setWildDetail('Rotwild','Schmaltier')">Schmaltier</button>
-<button onclick="setWildDetail('Rotwild','Kalb')">Kalb</button>
-<button onclick="zeigeSeite('wild')">⬅ Zurück</button>
+<!-- WORKFLOW: WILDART -->
+<div id="wild" class="page">
+  <h3>Wildart</h3>
+  <button onclick="zeigeSeite('reh')">Rehwild</button>
+  <button onclick="zeigeSeite('hirsch')">Rotwild</button>
+  <button onclick="zeigeSeite('gams')">Gamswild</button>
+  <button onclick="setWild('Fuchs')">Fuchs</button>
+  <button onclick="setWild('Hase')">Hase</button>
+  <button onclick="zeigeSeite('andere')">Andere</button>
+  <button class="secondary" onclick="zeigeSeite('name')">⬅ Zurück</button>
 </div>
 
-<div id="gams" class="hidden">
-<h3>Gamswild</h3>
-<button onclick="setWildDetail('Gamswild','Bock')">Bock</button>
-<button onclick="setWildDetail('Gamswild','Geiß')">Geiß</button>
-<button onclick="setWildDetail('Gamswild','Jahrling')">Jahrling</button>
-<button onclick="setWildDetail('Gamswild','Kitz')">Kitz</button>
-<button onclick="zeigeSeite('wild')">⬅ Zurück</button>
+<div id="reh" class="page">
+  <h3>Rehwild</h3>
+  <button onclick="setWildDetail('Rehwild','T-Bock')">T-Bock</button>
+  <button onclick="setWildDetail('Rehwild','J-Bock')">J-Bock</button>
+  <button onclick="setWildDetail('Rehwild','Geiß')">Geiß</button>
+  <button onclick="setWildDetail('Rehwild','Schmalgeiß')">Schmalgeiß</button>
+  <button onclick="setWildDetail('Rehwild','Kitz')">Kitz</button>
+  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
 </div>
 
-<div id="andere" class="hidden">
-<h3>Andere Wildart</h3>
-<input id="andereInput">
-<button onclick="setAndere()">Weiter</button>
-<button onclick="zeigeSeite('wild')">⬅ Zurück</button>
+<div id="hirsch" class="page">
+  <h3>Rotwild</h3>
+  <button onclick="setWildDetail('Rotwild','T-Hirsch')">T-Hirsch</button>
+  <button onclick="setWildDetail('Rotwild','J-Hirsch')">J-Hirsch</button>
+  <button onclick="setWildDetail('Rotwild','Tier')">Tier</button>
+  <button onclick="setWildDetail('Rotwild','Schmaltier')">Schmaltier</button>
+  <button onclick="setWildDetail('Rotwild','Kalb')">Kalb</button>
+  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
 </div>
 
-<div id="gewicht" class="hidden">
-<h3>Gewicht (kg)</h3>
-<select id="inputGewicht" onchange="autoGewicht()"></select>
-<button onclick="nextOrt()">Weiter</button>
-<button onclick="zeigeSeite('wild')">⬅ Zurück</button>
+<div id="gams" class="page">
+  <h3>Gamswild</h3>
+  <button onclick="setWildDetail('Gamswild','Bock')">Bock</button>
+  <button onclick="setWildDetail('Gamswild','Geiß')">Geiß</button>
+  <button onclick="setWildDetail('Gamswild','Jährling')">Jährling</button>
+  <button onclick="setWildDetail('Gamswild','Kitz')">Kitz</button>
+  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
 </div>
 
-<div id="ort" class="hidden">
-<h3>Örtlichkeit</h3>
-<button onclick="setOrt('Prad')">Prad</button>
-<button onclick="zeigeAndereOrt()">Andere</button>
-
-<div id="andereOrtBox" class="hidden">
-<input id="inputOrt" placeholder="Ort eingeben">
-<button onclick="setAndereOrt()">Weiter</button>
+<div id="andere" class="page">
+  <h3>Andere Wildart</h3>
+  <input id="andereInput" autocomplete="off">
+  <button onclick="setAndere()">Weiter</button>
+  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
 </div>
 
-<button onclick="zeigeSeite('gewicht')">⬅ Zurück</button>
+<div id="gewicht" class="page">
+  <h3>Gewicht (kg)</h3>
+  <select id="inputGewicht"></select>
+  <button onclick="nextOrt()">Weiter</button>
+  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
 </div>
 
-<div id="zeit" class="hidden">
-<h3>Schusszeit</h3>
-<input type="time" id="inputZeit" onchange="autoZeit()">
-<button onclick="nextDatum()">Weiter</button>
-<button onclick="zeigeSeite('ort')">⬅ Zurück</button>
+<div id="ort" class="page">
+  <h3>Örtlichkeit</h3>
+  <button onclick="setOrt('Prad')">Prad (Karte)</button>
+  <button onclick="zeigeAndereOrt()">Andere</button>
+
+  <div id="andereOrtBox" style="display:none;">
+    <input id="inputOrt" placeholder="Ort eingeben" autocomplete="off">
+    <button onclick="setAndereOrt()">Weiter</button>
+  </div>
+
+  <button class="secondary" onclick="zeigeSeite('gewicht')">⬅ Zurück</button>
 </div>
 
-<div id="datum" class="hidden">
-<h3>Eingelagert Datum</h3>
-<input type="date" id="inputDatum" onchange="autoDatum()">
-<button onclick="nextVerwendung()">Weiter</button>
-<button onclick="zeigeSeite('zeit')">⬅ Zurück</button>
+<div id="zeit" class="page">
+  <h3>Schusszeit</h3>
+  <input type="time" id="inputZeit">
+  <button onclick="nextDatum()">Weiter</button>
+  <button class="secondary" onclick="zeigeSeite('ort')">⬅ Zurück</button>
 </div>
 
-<div id="verwendung" class="hidden">
-<h3>Verwendung</h3>
-<button onclick="finish('Eigengebrauch')">Eigengebrauch</button>
-<button onclick="finish('Verkauf')">Verkauf</button>
-<button onclick="zeigeSeite('datum')">⬅ Zurück</button>
+<div id="datum" class="page">
+  <h3>Eingelagert Datum</h3>
+  <input type="date" id="inputDatum">
+  <button onclick="nextVerwendung()">Weiter</button>
+  <button class="secondary" onclick="zeigeSeite('zeit')">⬅ Zurück</button>
+</div>
+
+<div id="verwendung" class="page">
+  <h3>Verwendung</h3>
+  <button onclick="finish('Eigengebrauch')">Eigengebrauch</button>
+  <button onclick="finish('Verkauf')">Verkauf</button>
+  <button class="secondary" onclick="zeigeSeite('datum')">⬅ Zurück</button>
 </div>
 
 </div>
 
-<!-- Karte -->
-<div id="mapPopup" class="popup hidden">
-<h3>Karte Prad</h3>
-<div style="position:relative;">
-  <img id="mapImage" src="https://raw.githubusercontent.com/MichaelUnterkircher/meine-website/main/Revier2.png" style="width:100%;cursor:crosshair;">
-</div>
-<button onclick="closeMap()">OK</button>
+<!-- KARTE POPUP -->
+<div id="mapOverlay" class="popup-overlay" style="display:none;" onclick="closeMap()"></div>
+<div id="mapPopup" class="popup" style="display:none;">
+  <h3>Karte Prad</h3>
+  <div id="mapContainer" style="position:relative;">
+    <img id="mapImage"
+         alt="Revierkarte"
+         src="https://raw.githubusercontent.com/MichaelUnterkircher/meine-website/main/Revier2.png"
+         style="width:100%;display:block;cursor:crosshair;">
+  </div>
+  <div class="marker-legend">
+    <span><i style="background:yellow"></i>Reh</span>
+    <span><i style="background:red"></i>Rot</span>
+    <span><i style="background:#888"></i>Gams</span>
+    <span><i style="background:blue"></i>sonst</span>
+  </div>
+  <p class="hint" id="mapHint">Tippe auf die Karte, um den Abschussort zu markieren.</p>
+  <button onclick="closeMap()">OK</button>
 </div>
 
 <script>
-let daten = JSON.parse(localStorage.getItem("daten")) || [];
-let e = {};
-let aktuellerPunkt = null;
-let mapMode = "input";
+/* ============================================================
+   Abschussliste Jagdrevier Prad
+   - Speicherung: localStorage (Key "daten")
+   - Single-File-Web-App, funktioniert offline nach erstem Laden
+   ============================================================ */
 
-for(let i=0;i<=200;i++){
-let opt=document.createElement("option");
-opt.value=i;
-opt.text=i+" kg";
-inputGewicht.appendChild(opt);
+let daten = JSON.parse(localStorage.getItem("daten") || "[]");
+let e = {};                     // aktueller Eintrag im Workflow
+let aktuellerPunkt = null;      // zuletzt gesetzter Map-Punkt (als % !)
+let mapMode = "input";          // "input" | "view" | "single"
+let viewIndex = null;           // Index bei "single"-Ansicht
+
+/* --- Gewicht-Dropdown füllen --- */
+const selGewicht = document.getElementById("inputGewicht");
+for (let i = 0; i <= 200; i++) {
+  const opt = document.createElement("option");
+  opt.value = i;
+  opt.text = i + " kg";
+  selGewicht.appendChild(opt);
 }
 
-function autoGewicht(){
-let v=inputGewicht.value;
-if(!v) return;
-e.gewicht=v;
-zeigeSeite("ort");
+/* --- Seiten-Navigation: nur .page-Divs umschalten --- */
+function zeigeSeite(id) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  const el = document.getElementById(id);
+  if (el) el.classList.add("active");
 }
 
-function speichern(){
-localStorage.setItem("daten", JSON.stringify(daten));
+/* --- Persistenz --- */
+function speichern() {
+  localStorage.setItem("daten", JSON.stringify(daten));
 }
 
-function zeigeSeite(id){
-document.querySelectorAll("div[id]").forEach(d=>{
-  d.classList.add("hidden");
-  d.style.display="";
-});
-let el=document.getElementById(id);
-el.classList.remove("hidden");
-el.style.display="block";
+/* --- Neuer Eintrag: Workflow zurücksetzen --- */
+function neuerEintrag() {
+  e = {};
+  aktuellerPunkt = null;
+  document.getElementById("inputName").value = "";
+  document.getElementById("andereInput").value = "";
+  document.getElementById("inputOrt").value = "";
+  document.getElementById("inputZeit").value = "";
+  document.getElementById("inputDatum").value = "";
+  document.getElementById("andereOrtBox").style.display = "none";
+  zeigeSeite("name");
 }
 
-function nextWild(){
-let v=inputName.value.trim();
-if(!v) return alert("Bitte Name eingeben!");
-e.name=v;
-zeigeSeite("wild");
+/* --- Workflow-Schritte --- */
+function nextWild() {
+  const v = document.getElementById("inputName").value.trim();
+  if (!v) return alert("Bitte Name eingeben!");
+  e.name = v;
+  zeigeSeite("wild");
 }
 
-function setWild(w){
-e.wildart=w;
-e.wild="";
-if(w==="Fuchs" || w==="Hase"){
-  e.gewicht="";
-  zeigeSeite("ort");
-} else {
+function setWild(w) {
+  e.wildart = w;
+  e.wild = "";
+  if (w === "Fuchs" || w === "Hase") {
+    e.gewicht = "";
+    zeigeSeite("ort");
+  } else {
+    zeigeSeite("gewicht");
+  }
+}
+
+function setWildDetail(a, d) {
+  e.wildart = a;
+  e.wild = d;
   zeigeSeite("gewicht");
 }
+
+function setAndere() {
+  const v = document.getElementById("andereInput").value.trim();
+  if (!v) return alert("Bitte Wildart eingeben!");
+  e.wildart = v;
+  e.wild = "";
+  zeigeSeite("gewicht");
 }
 
-function setWildDetail(a,d){
-e.wildart=a;
-e.wild=d;
-zeigeSeite("gewicht");
+function nextOrt() {
+  e.gewicht = document.getElementById("inputGewicht").value;
+  zeigeSeite("ort");
 }
 
-function setAndere(){
-let v=andereInput.value.trim();
-if(!v) return alert("Bitte Wildart eingeben!");
-e.wildart=v;
-e.wild="";
-zeigeSeite("gewicht");
+function setOrt(o) {
+  if (o === "Prad") {
+    openMap("input");
+  } else {
+    e.ort = o;
+    zeigeSeite("zeit");
+  }
 }
 
-function nextOrt(){
-e.gewicht=inputGewicht.value;
-zeigeSeite("ort");
+function zeigeAndereOrt() {
+  document.getElementById("andereOrtBox").style.display = "block";
 }
 
-function setOrt(o){
-if(o==="Prad"){
-  openMap("input");
-} else {
-  e.ort=o;
+function setAndereOrt() {
+  const v = document.getElementById("inputOrt").value.trim();
+  if (!v) return alert("Bitte Ort eingeben!");
+  e.ort = v;
   zeigeSeite("zeit");
 }
+
+function nextDatum() {
+  const v = document.getElementById("inputZeit").value;
+  if (!v) return alert("Bitte Schusszeit!");
+  e.zeit = v;
+  zeigeSeite("datum");
 }
 
-function zeigeAndereOrt(){
-document.getElementById("andereOrtBox").classList.remove("hidden");
-}
-
-function setAndereOrt(){
-let v=inputOrt.value.trim();
-if(!v) return alert("Bitte Ort eingeben!");
-e.ort=v;
-zeigeSeite("zeit");
-}
-
-function nextDatum(){
-let v=inputZeit.value;
-if(!v) return alert("Bitte Schusszeit!");
-e.zeit=v;
-zeigeSeite("datum");
-}
-
-function autoZeit(){
-let v=inputZeit.value;
-if(!v) return;
-e.zeit=v;
-zeigeSeite("datum");
-}
-
-function nextVerwendung(){
-let v=inputDatum.value;
-if(!v) return alert("Bitte Datum!");
-e.datum=v;
-
-if(e.wildart==="Fuchs"){
-  finish("");
-} else {
-  zeigeSeite("verwendung");
-}
-}
-
-function autoDatum(){
-let v=inputDatum.value;
-if(!v) return;
-e.datum=v;
-
-if(e.wildart==="Fuchs"){
-  finish("");
-} else {
-  zeigeSeite("verwendung");
-}
-}
-
-function finish(v){
-e.verwendung=v;
-e.entnommen="";
-e.abfall=null;
-daten.push(e);
-speichern();
-anzeigen();
-e={};
-zeigeSeite("revier");
-}
-
-/* Karte */
-function openMap(mode="input"){
-mapMode = mode;
-
-let popup=document.getElementById("mapPopup");
-popup.classList.remove("hidden");
-popup.querySelectorAll(".marker").forEach(m=>m.remove());
-
-if(e.koord){
-  drawMarker(e.koord.x,e.koord.y,e.wildart);
-}
-}
-
-/* NEU: Alle Punkte anzeigen */
-function openMapAll(){
-mapMode = "view";
-
-let popup=document.getElementById("mapPopup");
-popup.classList.remove("hidden");
-popup.querySelectorAll(".marker").forEach(m=>m.remove());
-
-daten.forEach(d=>{
-  if(d.koord){
-   drawMarker(d.koord.x,d.koord.y,d.wildart);
+function nextVerwendung() {
+  const v = document.getElementById("inputDatum").value;
+  if (!v) return alert("Bitte Datum!");
+  e.datum = v;
+  if (e.wildart === "Fuchs") {
+    finish("");
+  } else {
+    zeigeSeite("verwendung");
   }
-});
 }
 
-function closeMap(){
-document.getElementById("mapPopup").classList.add("hidden");
-
-if(mapMode === "view"){
+function finish(v) {
+  e.verwendung = v;
+  e.entnommen = "";
+  e.abfall = null;
+  daten.push(e);
+  speichern();
+  anzeigen();
+  e = {};
+  aktuellerPunkt = null;
   zeigeSeite("revier");
-  return;
 }
 
-if(aktuellerPunkt){
-  e.koord=aktuellerPunkt;
-}
+/* ============================================================
+   KARTE
+   Koordinaten werden als Prozentwerte (0..1) gespeichert,
+   damit Marker bei jedem Zoom/Display korrekt sitzen.
+   ============================================================ */
 
-e.ort="Prad";
-zeigeSeite("zeit");
-}
+function openMap(mode, index) {
+  mapMode = mode;
+  viewIndex = (index == null) ? null : index;
 
-function drawMarker(x,y,wildart){
-let container=document.getElementById("mapImage").parentElement;
+  document.getElementById("mapOverlay").style.display = "block";
+  document.getElementById("mapPopup").style.display = "block";
+  document.getElementById("mapHint").style.display =
+    (mode === "input") ? "block" : "none";
 
-let marker=document.createElement("div");
-marker.className="marker";
+  clearMarkers();
 
-if(wildart==="Rehwild"){
-  marker.style.background="yellow";
-} else if(wildart==="Rotwild"){
-  marker.style.background="red";
-} else {
-  marker.style.background="blue";
-}
-
-marker.style.left=x+"px";
-marker.style.top=y+"px";
-
-container.appendChild(marker);
-}
-
-document.getElementById("mapImage").addEventListener("click",function(ev){
-if(mapMode==="view") return;
-
-let rect=this.getBoundingClientRect();
-let x=ev.clientX-rect.left;
-let y=ev.clientY-rect.top;
-
-aktuellerPunkt={x:Math.round(x),y:Math.round(y)};
-drawMarker(x,y,e.wildart);
-});
-
-function openMapFromTable(i){
-let eintrag=daten[i];
-openMap("view");
-
-setTimeout(()=>{
-  if(eintrag.koord){
-   drawMarker(eintrag.koord.x,eintrag.koord.y,eintrag.wildart);
+  if (mode === "input") {
+    if (e.koord) drawMarker(e.koord.x, e.koord.y, e.wildart);
+  } else if (mode === "view") {
+    daten.forEach(d => {
+      if (d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart);
+    });
+  } else if (mode === "single") {
+    const d = daten[viewIndex];
+    if (d && d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart);
   }
-},100);
 }
 
-/* Tabelle */
-function anzeigen(){
-let t=document.getElementById("tabelle");
-t.innerHTML=`<tr>
-<th>Name</th><th>Wildart</th><th>Wild</th><th>kg</th><th>Ort</th>
-<th>Schusszeit</th><th>Eingelagert</th><th>Entnommen</th>
-<th>Verwendung</th><th>Abfall</th></tr>`;
+function openMapAll() { openMap("view"); }
+function openMapFromTable(i) { openMap("single", i); }
 
-daten.forEach((d,i)=>{
-let r=t.insertRow();
-r.insertCell(0).innerText=d.name;
-r.insertCell(1).innerText=d.wildart;
-r.insertCell(2).innerText=d.wild;
-r.insertCell(3).innerText=d.gewicht;
-
-if(d.ort==="Prad" && d.koord){
-  r.insertCell(4).innerHTML=`<span style="color:blue;cursor:pointer;" onclick="openMapFromTable(${i})">Prad (Karte)</span>`;
-} else {
-  r.insertCell(4).innerText=d.ort;
+function clearMarkers() {
+  document.querySelectorAll("#mapContainer .marker").forEach(m => m.remove());
 }
 
-r.insertCell(5).innerText=d.zeit;
-r.insertCell(6).innerText=formatDatum(d.datum);
+function closeMap() {
+  document.getElementById("mapOverlay").style.display = "none";
+  document.getElementById("mapPopup").style.display = "none";
 
-let ent=r.insertCell(7);
-if(!d.entnommen){
-  ent.innerHTML=`<span class="entnommen-btn" onclick="openDate(${i})">+</span>
-  <input type="date" id="date${i}" style="display:none;" onchange="setEntnommen(${i},this.value)">`;
-} else {
-  ent.innerText=formatDatum(d.entnommen);
-  ent.className="entnommen-done";
+  if (mapMode === "input") {
+    if (aktuellerPunkt) e.koord = aktuellerPunkt;
+    e.ort = "Prad";
+    zeigeSeite("zeit");
+  }
+  // bei "view"/"single" bleibt die aktuelle Seite erhalten
 }
 
-r.insertCell(8).innerText=d.verwendung;
+function drawMarker(xPct, yPct, wildart) {
+  const container = document.getElementById("mapContainer");
+  const marker = document.createElement("div");
+  marker.className = "marker";
 
-let ab=r.insertCell(9);
-if(d.abfall===null){
-  ab.innerHTML=`<span class="abfall-btn" onclick="handleAbfall(${i})">+</span>`;
-} else if(d.abfall==="nein"){
-  ab.innerText="Nein";
-  ab.className="abfall-grau";
-} else {
-  ab.innerText="Ja";
-  ab.className="abfall-ja";
+  const colors = {
+    "Rehwild": "yellow",
+    "Rotwild": "red",
+    "Gamswild": "#888"
+  };
+  marker.style.background = colors[wildart] || "blue";
+
+  marker.style.left = (xPct * 100) + "%";
+  marker.style.top  = (yPct * 100) + "%";
+
+  container.appendChild(marker);
 }
+
+/* Klick auf Karte -> Koordinate in % speichern */
+document.getElementById("mapImage").addEventListener("click", function (ev) {
+  if (mapMode !== "input") return;
+  const rect = this.getBoundingClientRect();
+  const xPct = (ev.clientX - rect.left) / rect.width;
+  const yPct = (ev.clientY - rect.top)  / rect.height;
+  aktuellerPunkt = { x: xPct, y: yPct };
+  clearMarkers();
+  drawMarker(xPct, yPct, e.wildart);
 });
+
+/* ============================================================
+   TABELLE
+   ============================================================ */
+
+function anzeigen() {
+  const t = document.getElementById("tabelle");
+  t.innerHTML = `<tr>
+    <th>Name</th><th>Wildart</th><th>Wild</th><th>kg</th><th>Ort</th>
+    <th>Schusszeit</th><th>Eingelagert</th><th>Entnommen</th>
+    <th>Verwendung</th><th>Abfall</th><th></th>
+  </tr>`;
+
+  daten.forEach((d, i) => {
+    const r = t.insertRow();
+    r.insertCell().innerText = d.name || "";
+    r.insertCell().innerText = d.wildart || "";
+    r.insertCell().innerText = d.wild || "";
+    r.insertCell().innerText = d.gewicht || "";
+
+    const ortCell = r.insertCell();
+    if (d.ort === "Prad" && d.koord) {
+      ortCell.innerHTML =
+        `<span style="color:blue;cursor:pointer;text-decoration:underline;"
+               onclick="openMapFromTable(${i})">Prad (Karte)</span>`;
+    } else {
+      ortCell.innerText = d.ort || "";
+    }
+
+    r.insertCell().innerText = d.zeit || "";
+    r.insertCell().innerText = formatDatum(d.datum);
+
+    /* Entnommen */
+    const ent = r.insertCell();
+    if (!d.entnommen) {
+      ent.innerHTML =
+        `<span class="entnommen-btn" onclick="openDate(${i})">+</span>
+         <input type="date" id="date${i}" style="display:none;"
+                onchange="setEntnommen(${i}, this.value)">`;
+    } else {
+      ent.innerText = formatDatum(d.entnommen);
+      ent.className = "entnommen-done";
+    }
+
+    r.insertCell().innerText = d.verwendung || "";
+
+    /* Abfall */
+    const ab = r.insertCell();
+    if (d.abfall === null || d.abfall === undefined) {
+      ab.innerHTML = `<span class="abfall-btn" onclick="handleAbfall(${i})">+</span>`;
+    } else if (d.abfall === "ja") {
+      ab.innerText = "Ja";
+      ab.className = "abfall-ja";
+    } else {
+      ab.innerText = "Nein";
+      ab.className = "abfall-nein";
+    }
+
+    /* Löschen */
+    const del = r.insertCell();
+    del.innerHTML = `<span class="del-btn" onclick="loescheEintrag(${i})">✕</span>`;
+  });
 }
 
-function formatDatum(d){
-if(!d) return "";
-let date=new Date(d);
-return `${String(date.getDate()).padStart(2,'0')}.${String(date.getMonth()+1).padStart(2,'0')}.${date.getFullYear()}`;
+function formatDatum(d) {
+  if (!d) return "";
+  const date = new Date(d);
+  if (isNaN(date)) return "";
+  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
 }
 
-function openDate(i){
-let el=document.getElementById("date"+i);
-if(el.showPicker) el.showPicker();
-else { el.style.display="block"; el.focus(); }
+function openDate(i) {
+  const el = document.getElementById("date" + i);
+  if (el.showPicker) el.showPicker();
+  else { el.style.display = "block"; el.focus(); }
 }
 
-function setEntnommen(i,val){
-if(val){
-  daten[i].entnommen=val;
+function setEntnommen(i, val) {
+  if (val) {
+    daten[i].entnommen = val;
+    speichern();
+    anzeigen();
+  }
+}
+
+function handleAbfall(i) {
+  const overlay = document.createElement("div");
+  overlay.className = "popup-overlay";
+  overlay.onclick = () => { overlay.remove(); box.remove(); };
+
+  const box = document.createElement("div");
+  box.className = "popup";
+  box.innerHTML = `
+    <h3>Abfall</h3>
+    <p>ACHTUNG: Abfall nur während Parkjagd.</p>
+    <button onclick="setAbfall(${i}, 'ja')">Ja</button>
+    <button class="danger" onclick="setAbfall(${i}, 'nein')">Nein</button>
+  `;
+  document.body.appendChild(overlay);
+  document.body.appendChild(box);
+}
+
+function setAbfall(i, val) {
+  daten[i].abfall = val;
+  speichern();
+  anzeigen();
+  document.querySelectorAll(".popup, .popup-overlay").forEach(el => {
+    if (el.id !== "mapPopup" && el.id !== "mapOverlay") el.remove();
+  });
+}
+
+function loescheEintrag(i) {
+  if (!confirm("Eintrag wirklich löschen?")) return;
+  daten.splice(i, 1);
   speichern();
   anzeigen();
 }
+
+/* ============================================================
+   EXPORT / IMPORT (JSON-Backup)
+   ============================================================ */
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "abschussliste_" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-function handleAbfall(i){
-let box=document.createElement("div");
-box.className="popup";
-box.innerHTML=`ACHTUNG!<br><br>
-Abfall nur während Parkjagd<br><br>
-<button onclick="setAbfall(${i},'bezahlt')">Ja</button>
-<button onclick="setAbfall(${i},'nein')">Nein</button>`;
-document.body.appendChild(box);
+function importJSON(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!Array.isArray(parsed)) throw new Error("Kein Array");
+      if (!confirm("Importierte Daten ersetzen die aktuelle Liste. Fortfahren?")) return;
+      daten = parsed;
+      speichern();
+      anzeigen();
+      alert("Import erfolgreich: " + daten.length + " Einträge.");
+    } catch (err) {
+      alert("Fehler beim Import: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  ev.target.value = "";
 }
 
-function setAbfall(i,val){
-daten[i].abfall=val;
-speichern();
-anzeigen();
-document.querySelector(".popup").remove();
-}
-
+/* --- Start --- */
 anzeigen();
 </script>
 
 </body>
 </html>
-
- 
-Unterkircher Michael
-Berufsbildungszentrum "Dipl. Ing. Luis Zuegg" Meran
-Tel. 0473/274900 - Fax 0473/274949
-ntrmhle21@bbzzuegg.it 
-Fachlehrer Elektrotechnik – insegnante elettrotecnica
-SSP-RLS
-Rennstallweg 24
-39012 Meran
-
