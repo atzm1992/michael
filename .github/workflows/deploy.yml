@@ -1,0 +1,41 @@
+name: Deploy to Namecheap (jagdvereinprad.atz.bz)
+
+# Triggert bei Push auf main – und manuell aus der Actions-Oberfläche.
+# Die FTP-Zugangsdaten kommen aus GitHub-Secrets und sind NICHT in dieser Datei.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          protocol: ftps
+          port: 21
+          # Namecheap FTP-User mit Domain-Scope landen direkt im
+          # Dokumenten-Root der Subdomain, daher "/".
+          # Falls nicht, in GitHub-Secret FTP_DIR einen Pfad setzen
+          # (z.B. /jagdvereinprad.atz.bz/ oder /planz/).
+          server-dir: ${{ secrets.FTP_DIR || '/' }}
+          # Was NICHT hochgeladen werden soll:
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .github/**
+            README.md
+            api/config.php
+            api/config.local.php
+            *.sql
+            *.md
+            LICENSE
