@@ -5,15 +5,27 @@
 <title>Abschussliste Jagdrevier Prad</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2e7d32">
-
 <style>
+:root {
+  --gruen: #2e7d32;
+  --gruen-d: #1b5e20;
+  --gruen-l: #e8f5e9;
+  --rot: #c62828;
+  --blau: #1565c0;
+  --grau: #666;
+  --bg: #2e7d32;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #2e7d32;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  background: var(--bg);
   display: flex;
   justify-content: center;
   padding: 10px;
+  min-height: 100vh;
 }
 
 .container {
@@ -21,681 +33,1021 @@ body {
   padding: 15px;
   border-radius: 15px;
   width: 100%;
-  max-width: 600px;
+  max-width: 900px;
+  position: relative;
 }
 
 .page { display: none; }
 .page.active { display: block; }
 
+.header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+.header img {
+  width: 120px;
+  height: auto;
+  margin-bottom: 6px;
+}
+.header h2 {
+  color: var(--gruen);
+  font-size: 1.3em;
+  margin-bottom: 2px;
+}
+.header .code { font-size: 0.85em; color: var(--grau); }
+
 .topbar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
 }
-.topbar button { flex: 1; }
+.topbar button { flex: 1; min-width: 80px; }
 
 button {
-  padding: 12px;
-  margin: 5px 0;
+  padding: 12px 16px;
+  margin: 4px 0;
   border: none;
-  border-radius: 10px;
-  background: #2e7d32;
+  border-radius: var(--radius);
+  background: var(--gruen);
   color: white;
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
+  transition: background 0.2s;
 }
-button:hover { background: #1b5e20; }
-button.secondary { background: #777; }
-button.danger { background: #c62828; }
-
-.table-wrapper { overflow-x: auto; }
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  min-width: 1000px;
+button:hover { background: var(--gruen-d); }
+button:active { transform: scale(0.97); }
+button.sec { background: #777; }
+button.sec:hover { background: #555; }
+button.danger { background: var(--rot); }
+button.danger:hover { background: #a11; }
+button.sm {
+  padding: 6px 12px;
+  font-size: 13px;
+  margin: 2px;
 }
+button.full { width: 100%; }
 
-th, td {
-  border: 1px solid #ccc;
-  padding: 5px;
-  text-align: center;
-}
-
-th {
-  background: #2e7d32;
-  color: white;
-}
-
-.entnommen-btn {
-  background: red;
-  color: white;
-  border-radius: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.entnommen-done { background: #e8f5e9; }
-
-.abfall-btn {
-  background: blue;
-  color: white;
-  border-radius: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.abfall-ja { background: #4caf50; color: white; }
-.abfall-nein { background: #f44336; color: white; }
-
-.del-btn {
-  background: #c62828;
-  color: white;
-  border-radius: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-input, select {
+input, select, textarea {
   width: 100%;
   padding: 10px;
-  margin-top: 10px;
+  margin: 6px 0;
   border-radius: 8px;
   border: 1px solid #ccc;
-  box-sizing: border-box;
   font-size: 16px;
+  font-family: inherit;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--gruen);
+  box-shadow: 0 0 0 2px rgba(46,125,50,0.2);
 }
 
-.popup {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+.year-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.year-tab {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid var(--gruen);
   background: white;
-  padding: 20px;
+  color: var(--gruen);
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.year-tab:hover { background: var(--gruen-l); }
+.year-tab.active { background: var(--gruen); color: white; }
+
+.admin-badge {
+  display: inline-block;
+  background: #ef6c00;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
   border-radius: 10px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  width: 90%;
-  max-width: 360px;
+  vertical-align: middle;
+}
+
+.table-wrapper { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border: 1px solid #ddd; padding: 6px 5px; text-align: center; white-space: nowrap; }
+th { background: var(--gruen); color: white; font-size: 12px; position: sticky; top: 0; }
+tr:nth-child(even) { background: #f9f9f9; }
+tr:hover { background: var(--gruen-l); }
+
+.tag-btn {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  border: none;
+  color: white;
+}
+.tag-ent { background: #e53935; }
+.tag-del { background: #c62828; }
+.tag-edit { background: #ef6c00; }
+.tag-abf { background: var(--blau); }
+.tag-ja { background: #4caf50; }
+.tag-nein { background: #f44336; }
+.tag-done { background: #81c784; color: #1b5e20; }
+.link { color: var(--blau); cursor: pointer; text-decoration: underline; }
+
+.cards { display: none; }
+.card {
+  border: 1px solid #ddd;
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #fafafa;
+}
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 4px;
+}
+.card-head strong { font-size: 15px; color: var(--gruen-d); }
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+.card-grid .label { color: var(--grau); font-size: 11px; }
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 700px) {
+  .table-wrapper { display: none; }
+  .cards { display: block; }
+  .container { padding: 10px; }
+  .header h2 { font-size: 1.1em; }
+}
+@media (min-width: 701px) {
+  .cards { display: none; }
 }
 
 .popup-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0,0,0,0.45);
   z-index: 999;
 }
+.popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  z-index: 1000;
+  width: 92%;
+  max-width: 400px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.summary-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+.summary-table td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: left; white-space: normal; }
+.summary-table td:first-child { font-weight: bold; color: var(--grau); width: 40%; }
 
 .marker {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
-  border: 1px solid black;
+  transform: translate(-50%,-50%);
+  border: 2px solid rgba(0,0,0,0.5);
   pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
+.marker-legend { font-size: 12px; margin-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+.marker-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.marker-legend i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.5); display: inline-block; }
 
-.marker-legend {
-  font-size: 12px;
-  margin-top: 5px;
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.marker-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.marker-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid black;
-  display: inline-block;
-}
+.hint { font-size: 12px; color: #555; margin: 6px 0; }
 
-.hint {
-  font-size: 12px;
-  color: #555;
-  margin: 6px 0;
-}
+.admin-section { margin: 12px 0; padding: 12px; background: #f5f5f5; border-radius: var(--radius); }
+.admin-section h4 { margin-bottom: 8px; color: var(--gruen-d); }
+.admin-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+.admin-row label { min-width: 120px; font-size: 14px; }
+.admin-row input, .admin-row select, .admin-row textarea { flex: 1; min-width: 120px; margin: 0; }
+
+.edit-row { margin: 8px 0; }
+.edit-row label { display: block; font-size: 12px; color: var(--grau); margin-bottom: 2px; }
+.edit-row input, .edit-row select { margin: 0; }
+
+.btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+.btn-grid button { width: 100%; margin: 0; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 10px 0; }
+.stat-box { background: var(--gruen-l); padding: 10px; border-radius: var(--radius); text-align: center; }
+.stat-box .num { font-size: 1.5em; font-weight: bold; color: var(--gruen-d); }
+.stat-box .lbl { font-size: 11px; color: var(--grau); }
 </style>
 </head>
-
 <body>
 <div class="container">
 
 <!-- STARTSEITE -->
 <div id="start" class="page active">
-  <h2>Abschussliste Jagdrevier Prad</h2>
-  <div>Zahlencode: 1024</div>
-  <img src="491438944_10226782024328158_4391837002889702168_n.jpg"
-       alt="Revierlogo"
-       style="width:180px;display:block;margin:auto;"
-       onerror="this.style.display='none'">
-  <div class="topbar">
-    <button onclick="zeigeSeite('park')">Park</button>
-    <button onclick="zeigeSeite('revier')">Revier</button>
+  <div class="header">
+    <img src="491438944_10226782024328158_4391837002889702168_n.jpg"
+         alt="Revierlogo" onerror="this.style.display='none'" id="logoImg">
+    <h2>Abschussliste<br>Jagdrevier Prad</h2>
+    <div class="code">Zahlencode: 1024</div>
   </div>
   <div class="topbar">
-    <button class="secondary" onclick="exportJSON()">Export JSON</button>
-    <button class="secondary" onclick="document.getElementById('importFile').click()">Import JSON</button>
+    <button onclick="zeigeSeite('park')">🌲 Park</button>
+    <button onclick="zeigeSeite('revier')">🎯 Revier</button>
+  </div>
+  <div class="topbar">
+    <button class="sec" onclick="exportJSON()">📤 Export</button>
+    <button class="sec" onclick="document.getElementById('importFile').click()">📥 Import</button>
     <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importJSON(event)">
   </div>
+  <button class="sec full" onclick="showLogin()" style="margin-top:6px;" id="btnAdminStart">🔐 Admin</button>
 </div>
 
 <!-- PARK -->
 <div id="park" class="page">
-  <h2>Park</h2>
-  <p>noch nicht aktiv</p>
-  <button onclick="zeigeSeite('start')">⬅ Zurück</button>
+  <div class="header"><h2>🌲 Park</h2></div>
+  <p style="text-align:center;color:var(--grau);padding:30px 0;">Noch nicht aktiv</p>
+  <button class="sec full" onclick="zeigeSeite('start')">⬅ Zurück</button>
 </div>
 
-<!-- REVIER / TABELLE -->
+<!-- REVIER -->
 <div id="revier" class="page">
+  <div class="header">
+    <img src="491438944_10226782024328158_4391837002889702168_n.jpg"
+         alt="" style="width:60px;" onerror="this.style.display='none'">
+    <h2 id="revierTitle">Jagdrevier Prad</h2>
+    <div id="adminIndicator" style="display:none;">
+      <span class="admin-badge">ADMIN</span>
+      <span style="font-size:11px;color:var(--grau);cursor:pointer;margin-left:6px;" onclick="adminLogout()">abmelden</span>
+    </div>
+  </div>
+  <div id="yearTabsContainer" class="year-tabs"></div>
+  <div id="statsContainer" class="stats"></div>
   <div class="topbar">
     <button onclick="neuerEintrag()">➕ Neuer Eintrag</button>
     <button onclick="openMapAll()">🗺️ Karte</button>
-    <button onclick="zeigeSeite('start')">⬅ Zurück</button>
+    <button class="sec" onclick="zeigeSeite('start')">⬅ Zurück</button>
   </div>
-  <div class="table-wrapper">
-    <table id="tabelle"></table>
+  <div class="table-wrapper"><table id="tabelle"></table></div>
+  <div class="cards" id="cardsContainer"></div>
+</div>
+
+<!-- WORKFLOW -->
+<div id="wf-name" class="page">
+  <h3>👤 Name Erleger</h3>
+  <input id="inputName" autocomplete="off" placeholder="Name eingeben...">
+  <div id="nameSuggestions" style="margin:4px 0;"></div>
+  <button onclick="nextWild()">Weiter ➡</button>
+  <button class="sec" onclick="zeigeSeite('revier')">⬅ Abbrechen</button>
+</div>
+
+<div id="wf-wild" class="page">
+  <h3>🦌 Wildart</h3>
+  <div class="btn-grid">
+    <button onclick="zeigeSeite('wf-reh')">Rehwild</button>
+    <button onclick="zeigeSeite('wf-hirsch')">Rotwild</button>
+    <button onclick="zeigeSeite('wf-gams')">Gamswild</button>
+    <button onclick="setWild('Fuchs')">Fuchs</button>
+    <button onclick="setWild('Hase')">Hase</button>
+    <button onclick="zeigeSeite('wf-andere')">Andere</button>
   </div>
+  <button class="sec full" onclick="zeigeSeite('wf-name')">⬅ Zurück</button>
 </div>
 
-<!-- WORKFLOW: NAME -->
-<div id="name" class="page">
-  <h3>Name Erleger</h3>
-  <input id="inputName" autocomplete="off">
-  <button onclick="nextWild()">Weiter</button>
-  <button class="secondary" onclick="zeigeSeite('revier')">⬅ Zurück</button>
+<div id="wf-reh" class="page">
+  <h3>🦌 Rehwild</h3>
+  <div class="btn-grid">
+    <button onclick="setWildDetail('Rehwild','T-Bock')">T-Bock</button>
+    <button onclick="setWildDetail('Rehwild','J-Bock')">J-Bock</button>
+    <button onclick="setWildDetail('Rehwild','Geiß')">Geiß</button>
+    <button onclick="setWildDetail('Rehwild','Schmalgeiß')">Schmalgeiß</button>
+    <button onclick="setWildDetail('Rehwild','Kitz')">Kitz</button>
+  </div>
+  <button class="sec full" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
 </div>
 
-<!-- WORKFLOW: WILDART -->
-<div id="wild" class="page">
-  <h3>Wildart</h3>
-  <button onclick="zeigeSeite('reh')">Rehwild</button>
-  <button onclick="zeigeSeite('hirsch')">Rotwild</button>
-  <button onclick="zeigeSeite('gams')">Gamswild</button>
-  <button onclick="setWild('Fuchs')">Fuchs</button>
-  <button onclick="setWild('Hase')">Hase</button>
-  <button onclick="zeigeSeite('andere')">Andere</button>
-  <button class="secondary" onclick="zeigeSeite('name')">⬅ Zurück</button>
+<div id="wf-hirsch" class="page">
+  <h3>🦌 Rotwild</h3>
+  <div class="btn-grid">
+    <button onclick="setWildDetail('Rotwild','T-Hirsch')">T-Hirsch</button>
+    <button onclick="setWildDetail('Rotwild','J-Hirsch')">J-Hirsch</button>
+    <button onclick="setWildDetail('Rotwild','Tier')">Tier</button>
+    <button onclick="setWildDetail('Rotwild','Schmaltier')">Schmaltier</button>
+    <button onclick="setWildDetail('Rotwild','Kalb')">Kalb</button>
+  </div>
+  <button class="sec full" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
 </div>
 
-<div id="reh" class="page">
-  <h3>Rehwild</h3>
-  <button onclick="setWildDetail('Rehwild','T-Bock')">T-Bock</button>
-  <button onclick="setWildDetail('Rehwild','J-Bock')">J-Bock</button>
-  <button onclick="setWildDetail('Rehwild','Geiß')">Geiß</button>
-  <button onclick="setWildDetail('Rehwild','Schmalgeiß')">Schmalgeiß</button>
-  <button onclick="setWildDetail('Rehwild','Kitz')">Kitz</button>
-  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
+<div id="wf-gams" class="page">
+  <h3>🐐 Gamswild</h3>
+  <div class="btn-grid">
+    <button onclick="setWildDetail('Gamswild','Bock')">Bock</button>
+    <button onclick="setWildDetail('Gamswild','Geiß')">Geiß</button>
+    <button onclick="setWildDetail('Gamswild','Jährling')">Jährling</button>
+    <button onclick="setWildDetail('Gamswild','Kitz')">Kitz</button>
+  </div>
+  <button class="sec full" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
 </div>
 
-<div id="hirsch" class="page">
-  <h3>Rotwild</h3>
-  <button onclick="setWildDetail('Rotwild','T-Hirsch')">T-Hirsch</button>
-  <button onclick="setWildDetail('Rotwild','J-Hirsch')">J-Hirsch</button>
-  <button onclick="setWildDetail('Rotwild','Tier')">Tier</button>
-  <button onclick="setWildDetail('Rotwild','Schmaltier')">Schmaltier</button>
-  <button onclick="setWildDetail('Rotwild','Kalb')">Kalb</button>
-  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
-</div>
-
-<div id="gams" class="page">
-  <h3>Gamswild</h3>
-  <button onclick="setWildDetail('Gamswild','Bock')">Bock</button>
-  <button onclick="setWildDetail('Gamswild','Geiß')">Geiß</button>
-  <button onclick="setWildDetail('Gamswild','Jährling')">Jährling</button>
-  <button onclick="setWildDetail('Gamswild','Kitz')">Kitz</button>
-  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
-</div>
-
-<div id="andere" class="page">
+<div id="wf-andere" class="page">
   <h3>Andere Wildart</h3>
-  <input id="andereInput" autocomplete="off">
-  <button onclick="setAndere()">Weiter</button>
-  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
+  <input id="andereInput" autocomplete="off" placeholder="Wildart eingeben...">
+  <button onclick="setAndere()">Weiter ➡</button>
+  <button class="sec" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
 </div>
 
-<div id="gewicht" class="page">
-  <h3>Gewicht (kg)</h3>
+<div id="wf-gewicht" class="page">
+  <h3>⚖️ Gewicht (kg)</h3>
   <select id="inputGewicht"></select>
-  <button onclick="nextOrt()">Weiter</button>
-  <button class="secondary" onclick="zeigeSeite('wild')">⬅ Zurück</button>
+  <button onclick="nextOrt()">Weiter ➡</button>
+  <button class="sec" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
 </div>
 
-<div id="ort" class="page">
-  <h3>Örtlichkeit</h3>
-  <button onclick="setOrt('Prad')">Prad (Karte)</button>
-  <button onclick="zeigeAndereOrt()">Andere</button>
+<div id="wf-ort" class="page">
+  <h3>📍 Örtlichkeit</h3>
+  <div class="btn-grid">
+    <button onclick="setOrt('Prad')">Prad (Karte)</button>
+    <button onclick="zeigeAndereOrt()">Andere</button>
+  </div>
+  <div id="andereOrtBox" style="display:none;margin-top:8px;">
+    <input id="inputOrt" placeholder="Ort eingeben..." autocomplete="off">
+    <button onclick="setAndereOrt()">Weiter ➡</button>
+  </div>
+  <button class="sec full" onclick="zeigeSeite('wf-gewicht')">⬅ Zurück</button>
+</div>
 
-  <div id="andereOrtBox" style="display:none;">
-    <input id="inputOrt" placeholder="Ort eingeben" autocomplete="off">
-    <button onclick="setAndereOrt()">Weiter</button>
+<div id="wf-zeit" class="page">
+  <h3>🕐 Schusszeit</h3>
+  <input type="time" id="inputZeit">
+  <p class="hint">Automatisch auf aktuelle Uhrzeit gesetzt.</p>
+  <button onclick="nextDatum()">Weiter ➡</button>
+  <button class="sec" onclick="zeigeSeite('wf-ort')">⬅ Zurück</button>
+</div>
+
+<div id="wf-datum" class="page">
+  <h3>📅 Datum (Einlagerung)</h3>
+  <input type="date" id="inputDatum">
+  <p class="hint">Automatisch auf heute gesetzt.</p>
+  <button onclick="nextVerwendung()">Weiter ➡</button>
+  <button class="sec" onclick="zeigeSeite('wf-zeit')">⬅ Zurück</button>
+</div>
+
+<div id="wf-verwendung" class="page">
+  <h3>📦 Verwendung</h3>
+  <div class="btn-grid">
+    <button onclick="gotoSummary('Eigengebrauch')">Eigengebrauch</button>
+    <button onclick="gotoSummary('Verkauf')">Verkauf</button>
+  </div>
+  <button class="sec full" onclick="zeigeSeite('wf-datum')">⬅ Zurück</button>
+</div>
+
+<!-- ZUSAMMENFASSUNG -->
+<div id="wf-summary" class="page">
+  <h3>✅ Zusammenfassung</h3>
+  <table class="summary-table" id="summaryTable"></table>
+  <div class="topbar" style="margin-top:12px;">
+    <button onclick="finishSave()">💾 Speichern</button>
+    <button class="sec" onclick="editFromSummary()">✏️ Bearbeiten</button>
+    <button class="danger" onclick="zeigeSeite('revier')">✕ Abbrechen</button>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div id="admin-login" class="page">
+  <h3>🔐 Admin-Login</h3>
+  <input id="adminUser" placeholder="Benutzer" autocomplete="off">
+  <input id="adminPass" type="password" placeholder="Passwort">
+  <button onclick="doLogin()">Anmelden</button>
+  <button class="sec" onclick="zeigeSeite('start')">⬅ Zurück</button>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="admin" class="page">
+  <h3>⚙️ Admin-Einstellungen</h3>
+
+  <div class="admin-section">
+    <h4>Allgemein</h4>
+    <div class="admin-row">
+      <label>Reviername:</label>
+      <input id="cfgRevier" value="Jagdrevier Prad">
+    </div>
+    <div class="admin-row">
+      <label>Zahlencode:</label>
+      <input id="cfgCode" value="1024">
+    </div>
   </div>
 
-  <button class="secondary" onclick="zeigeSeite('gewicht')">⬅ Zurück</button>
+  <div class="admin-section">
+    <h4>Abfall-Hinweistext</h4>
+    <div class="admin-row">
+      <textarea id="cfgAbfallText" rows="2" style="font-size:14px;"></textarea>
+    </div>
+    <p class="hint">Wird im Abfall-Dialog angezeigt.</p>
+  </div>
+
+  <div class="admin-section">
+    <h4>Passwort ändern</h4>
+    <div class="admin-row">
+      <label>Neues Passwort:</label>
+      <input id="cfgNewPass" type="password" placeholder="Neues Passwort">
+    </div>
+    <button class="sm" onclick="changePassword()">Passwort ändern</button>
+  </div>
+
+  <div class="admin-section">
+    <h4>Karten-URL</h4>
+    <div class="admin-row">
+      <input id="cfgMapUrl" placeholder="URL zur Revierkarte">
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <h4>Daten verwalten</h4>
+    <button class="sm danger" onclick="clearYearData()">Daten des gewählten Jahres löschen</button>
+    <button class="sm danger" onclick="clearAllData()">Alle Daten löschen</button>
+  </div>
+
+  <div style="margin-top:10px;">
+    <button class="full" onclick="saveConfig()">💾 Einstellungen speichern</button>
+  </div>
+  <div style="margin-top:6px;">
+    <button class="sec full" onclick="adminToRevier()">➡ Zur Liste (eingeloggt)</button>
+    <button class="sec full" onclick="adminLogoutFull()">🔓 Abmelden</button>
+  </div>
 </div>
 
-<div id="zeit" class="page">
-  <h3>Schusszeit</h3>
-  <input type="time" id="inputZeit">
-  <button onclick="nextDatum()">Weiter</button>
-  <button class="secondary" onclick="zeigeSeite('ort')">⬅ Zurück</button>
-</div>
-
-<div id="datum" class="page">
-  <h3>Eingelagert Datum</h3>
-  <input type="date" id="inputDatum">
-  <button onclick="nextVerwendung()">Weiter</button>
-  <button class="secondary" onclick="zeigeSeite('zeit')">⬅ Zurück</button>
-</div>
-
-<div id="verwendung" class="page">
-  <h3>Verwendung</h3>
-  <button onclick="finish('Eigengebrauch')">Eigengebrauch</button>
-  <button onclick="finish('Verkauf')">Verkauf</button>
-  <button class="secondary" onclick="zeigeSeite('datum')">⬅ Zurück</button>
-</div>
-
-</div>
+</div><!-- /container -->
 
 <!-- KARTE POPUP -->
 <div id="mapOverlay" class="popup-overlay" style="display:none;" onclick="closeMap()"></div>
-<div id="mapPopup" class="popup" style="display:none;">
-  <h3>Karte Prad</h3>
+<div id="mapPopup" class="popup" style="display:none;max-width:500px;">
+  <h3>🗺️ Karte Prad</h3>
   <div id="mapContainer" style="position:relative;">
-    <img id="mapImage"
-         alt="Revierkarte"
+    <img id="mapImage" alt="Revierkarte"
          src="https://raw.githubusercontent.com/MichaelUnterkircher/meine-website/main/Revier2.png"
-         style="width:100%;display:block;cursor:crosshair;">
+         style="width:100%;display:block;cursor:crosshair;"
+         onerror="this.alt='Karte nicht verfügbar'">
   </div>
   <div class="marker-legend">
     <span><i style="background:yellow"></i>Reh</span>
     <span><i style="background:red"></i>Rot</span>
     <span><i style="background:#888"></i>Gams</span>
-    <span><i style="background:blue"></i>sonst</span>
+    <span><i style="background:blue"></i>Sonst</span>
   </div>
   <p class="hint" id="mapHint">Tippe auf die Karte, um den Abschussort zu markieren.</p>
-  <button onclick="closeMap()">OK</button>
+  <button class="full" onclick="closeMap()">OK</button>
 </div>
 
 <script>
 /* ============================================================
-   Abschussliste Jagdrevier Prad
-   - Speicherung: localStorage (Key "daten")
-   - Single-File-Web-App, funktioniert offline nach erstem Laden
+   ABSCHUSSLISTE JAGDREVIER PRAD – V3
    ============================================================ */
 
-let daten = JSON.parse(localStorage.getItem("daten") || "[]");
-let e = {};                     // aktueller Eintrag im Workflow
-let aktuellerPunkt = null;      // zuletzt gesetzter Map-Punkt (als % !)
-let mapMode = "input";          // "input" | "view" | "single"
-let viewIndex = null;           // Index bei "single"-Ansicht
+let config = JSON.parse(localStorage.getItem("cfg") || '{}');
+if (!config.revier) config.revier = "Jagdrevier Prad";
+if (!config.code) config.code = "1024";
+if (!config.pass) config.pass = "1234";
+if (!config.mapUrl) config.mapUrl = "https://raw.githubusercontent.com/MichaelUnterkircher/meine-website/main/Revier2.png";
+if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
 
-/* --- Gewicht-Dropdown füllen --- */
-const selGewicht = document.getElementById("inputGewicht");
-for (let i = 0; i <= 200; i++) {
-  const opt = document.createElement("option");
-  opt.value = i;
-  opt.text = i + " kg";
-  selGewicht.appendChild(opt);
+let daten = JSON.parse(localStorage.getItem("daten") || "[]");
+let e = {};
+let aktuellerPunkt = null;
+let mapMode = "input";
+let viewIndex = null;
+let selectedYear = new Date().getFullYear();
+let isAdmin = false;
+
+/* ---------- Init ---------- */
+function init() {
+  const sel = document.getElementById("inputGewicht");
+  sel.innerHTML = "";
+  for (let i = 0; i <= 200; i++) {
+    const o = document.createElement("option");
+    o.value = i; o.text = i + " kg";
+    sel.appendChild(o);
+  }
+  applyConfig();
+  updateYearTabs();
+  anzeigen();
 }
 
-/* --- Seiten-Navigation: nur .page-Divs umschalten --- */
+function applyConfig() {
+  document.getElementById("cfgRevier").value = config.revier;
+  document.getElementById("cfgCode").value = config.code;
+  document.getElementById("cfgMapUrl").value = config.mapUrl;
+  document.getElementById("cfgAbfallText").value = config.abfallText;
+  document.getElementById("mapImage").src = config.mapUrl;
+
+  // Header texts
+  document.querySelectorAll('.header h2')[0].innerHTML = 'Abschussliste<br>' + esc(config.revier);
+  document.getElementById("revierTitle").textContent = config.revier;
+  document.querySelector('.header .code').textContent = 'Zahlencode: ' + config.code;
+
+  // Admin indicator
+  document.getElementById("adminIndicator").style.display = isAdmin ? "block" : "none";
+  document.getElementById("btnAdminStart").textContent = isAdmin ? "⚙️ Admin-Einstellungen" : "🔐 Admin";
+}
+
+function saveCfg() { localStorage.setItem("cfg", JSON.stringify(config)); }
+function speichern() { localStorage.setItem("daten", JSON.stringify(daten)); }
+
+/* ---------- Navigation ---------- */
 function zeigeSeite(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   const el = document.getElementById(id);
   if (el) el.classList.add("active");
 }
 
-/* --- Persistenz --- */
-function speichern() {
-  localStorage.setItem("daten", JSON.stringify(daten));
+/* ---------- Year ---------- */
+function getYears() {
+  const y = new Set();
+  daten.forEach(d => { if (d.datum) y.add(new Date(d.datum).getFullYear()); });
+  y.add(new Date().getFullYear());
+  return [...y].sort((a,b) => b - a);
 }
 
-/* --- Neuer Eintrag: Workflow zurücksetzen --- */
+function updateYearTabs() {
+  const c = document.getElementById("yearTabsContainer");
+  c.innerHTML = "";
+  getYears().forEach(y => {
+    const s = document.createElement("span");
+    s.className = "year-tab" + (y === selectedYear ? " active" : "");
+    s.textContent = y;
+    s.onclick = () => { selectedYear = y; updateYearTabs(); anzeigen(); };
+    c.appendChild(s);
+  });
+}
+
+function getFiltered() {
+  return daten.filter(d => d.datum && new Date(d.datum).getFullYear() === selectedYear);
+}
+function realIdx(fi) { return daten.indexOf(getFiltered()[fi]); }
+
+/* ---------- Stats ---------- */
+function updateStats() {
+  const fd = getFiltered();
+  const counts = {};
+  fd.forEach(d => { const w = d.wildart || "Andere"; counts[w] = (counts[w]||0) + 1; });
+  let h = `<div class="stat-box"><div class="num">${fd.length}</div><div class="lbl">Gesamt</div></div>`;
+  Object.keys(counts).sort().forEach(k => {
+    h += `<div class="stat-box"><div class="num">${counts[k]}</div><div class="lbl">${esc(k)}</div></div>`;
+  });
+  document.getElementById("statsContainer").innerHTML = h;
+}
+
+/* ---------- Workflow ---------- */
 function neuerEintrag() {
-  e = {};
-  aktuellerPunkt = null;
+  e = {}; aktuellerPunkt = null;
   document.getElementById("inputName").value = "";
   document.getElementById("andereInput").value = "";
   document.getElementById("inputOrt").value = "";
-  document.getElementById("inputZeit").value = "";
-  document.getElementById("inputDatum").value = "";
   document.getElementById("andereOrtBox").style.display = "none";
-  zeigeSeite("name");
+  const now = new Date();
+  document.getElementById("inputZeit").value =
+    String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  document.getElementById("inputDatum").value = now.toISOString().slice(0,10);
+  buildNameSugg();
+  zeigeSeite("wf-name");
 }
 
-/* --- Workflow-Schritte --- */
+function buildNameSugg() {
+  const names = [...new Set(daten.map(d => d.name).filter(Boolean))];
+  const c = document.getElementById("nameSuggestions");
+  c.innerHTML = "";
+  names.slice(0,8).forEach(n => {
+    const b = document.createElement("button");
+    b.className = "sm sec"; b.textContent = n;
+    b.onclick = () => { document.getElementById("inputName").value = n; nextWild(); };
+    c.appendChild(b);
+  });
+}
+
 function nextWild() {
   const v = document.getElementById("inputName").value.trim();
   if (!v) return alert("Bitte Name eingeben!");
-  e.name = v;
-  zeigeSeite("wild");
+  e.name = v; zeigeSeite("wf-wild");
 }
-
 function setWild(w) {
-  e.wildart = w;
-  e.wild = "";
-  if (w === "Fuchs" || w === "Hase") {
-    e.gewicht = "";
-    zeigeSeite("ort");
-  } else {
-    zeigeSeite("gewicht");
-  }
+  e.wildart = w; e.wild = "";
+  (w==="Fuchs"||w==="Hase") ? (e.gewicht="", zeigeSeite("wf-ort")) : zeigeSeite("wf-gewicht");
 }
-
-function setWildDetail(a, d) {
-  e.wildart = a;
-  e.wild = d;
-  zeigeSeite("gewicht");
-}
-
+function setWildDetail(a,d) { e.wildart=a; e.wild=d; zeigeSeite("wf-gewicht"); }
 function setAndere() {
   const v = document.getElementById("andereInput").value.trim();
   if (!v) return alert("Bitte Wildart eingeben!");
-  e.wildart = v;
-  e.wild = "";
-  zeigeSeite("gewicht");
+  e.wildart=v; e.wild=""; zeigeSeite("wf-gewicht");
 }
-
-function nextOrt() {
-  e.gewicht = document.getElementById("inputGewicht").value;
-  zeigeSeite("ort");
-}
-
-function setOrt(o) {
-  if (o === "Prad") {
-    openMap("input");
-  } else {
-    e.ort = o;
-    zeigeSeite("zeit");
-  }
-}
-
+function nextOrt() { e.gewicht = document.getElementById("inputGewicht").value; zeigeSeite("wf-ort"); }
+function setOrt(o) { o==="Prad" ? openMap("input") : (e.ort=o, zeigeSeite("wf-zeit")); }
 function zeigeAndereOrt() {
-  document.getElementById("andereOrtBox").style.display = "block";
+  document.getElementById("andereOrtBox").style.display="block";
+  document.getElementById("inputOrt").focus();
 }
-
 function setAndereOrt() {
   const v = document.getElementById("inputOrt").value.trim();
   if (!v) return alert("Bitte Ort eingeben!");
-  e.ort = v;
-  zeigeSeite("zeit");
+  e.ort=v; zeigeSeite("wf-zeit");
 }
-
 function nextDatum() {
   const v = document.getElementById("inputZeit").value;
   if (!v) return alert("Bitte Schusszeit!");
-  e.zeit = v;
-  zeigeSeite("datum");
+  e.zeit=v; zeigeSeite("wf-datum");
 }
-
 function nextVerwendung() {
   const v = document.getElementById("inputDatum").value;
   if (!v) return alert("Bitte Datum!");
-  e.datum = v;
-  if (e.wildart === "Fuchs") {
-    finish("");
-  } else {
-    zeigeSeite("verwendung");
-  }
+  e.datum=v;
+  e.wildart==="Fuchs" ? gotoSummary("") : zeigeSeite("wf-verwendung");
 }
 
-function finish(v) {
-  e.verwendung = v;
-  e.entnommen = "";
-  e.abfall = null;
+function gotoSummary(verw) {
+  if (!e.datum) e.datum = document.getElementById("inputDatum").value;
+  if (!e.zeit) e.zeit = document.getElementById("inputZeit").value;
+  e.verwendung = verw;
+  showSummary();
+}
+
+function showSummary() {
+  const rows = [
+    ["Erleger", e.name],
+    ["Wildart", e.wildart + (e.wild ? " – "+e.wild : "")],
+    ["Gewicht", e.gewicht ? e.gewicht+" kg" : "–"],
+    ["Ort", e.ort || "–"],
+    ["Karte", e.koord ? "✓ Markiert" : "–"],
+    ["Schusszeit", e.zeit || "–"],
+    ["Datum", formatDatum(e.datum)],
+    ["Verwendung", e.verwendung || "–"],
+  ];
+  document.getElementById("summaryTable").innerHTML =
+    rows.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("");
+  zeigeSeite("wf-summary");
+}
+
+function editFromSummary() {
+  document.getElementById("inputName").value = e.name||"";
+  zeigeSeite("wf-name");
+}
+
+function finishSave() {
+  e.entnommen = ""; e.abfall = null;
   daten.push(e);
   speichern();
-  anzeigen();
-  e = {};
-  aktuellerPunkt = null;
+  if (e.datum) selectedYear = new Date(e.datum).getFullYear();
+  updateYearTabs(); anzeigen();
+  e = {}; aktuellerPunkt = null;
   zeigeSeite("revier");
 }
 
-/* ============================================================
-   KARTE
-   Koordinaten werden als Prozentwerte (0..1) gespeichert,
-   damit Marker bei jedem Zoom/Display korrekt sitzen.
-   ============================================================ */
-
+/* ---------- Karte ---------- */
 function openMap(mode, index) {
-  mapMode = mode;
-  viewIndex = (index == null) ? null : index;
-
+  mapMode = mode; viewIndex = index ?? null;
   document.getElementById("mapOverlay").style.display = "block";
   document.getElementById("mapPopup").style.display = "block";
-  document.getElementById("mapHint").style.display =
-    (mode === "input") ? "block" : "none";
-
+  document.getElementById("mapHint").style.display = mode==="input" ? "block" : "none";
   clearMarkers();
-
-  if (mode === "input") {
-    if (e.koord) drawMarker(e.koord.x, e.koord.y, e.wildart);
-  } else if (mode === "view") {
-    daten.forEach(d => {
-      if (d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart);
-    });
-  } else if (mode === "single") {
-    const d = daten[viewIndex];
-    if (d && d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart);
-  }
+  if (mode==="input" && e.koord) drawMarker(e.koord.x, e.koord.y, e.wildart);
+  else if (mode==="view") getFiltered().forEach(d => { if (d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart); });
+  else if (mode==="single") { const d=daten[viewIndex]; if (d&&d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart); }
 }
-
 function openMapAll() { openMap("view"); }
-function openMapFromTable(i) { openMap("single", i); }
-
-function clearMarkers() {
-  document.querySelectorAll("#mapContainer .marker").forEach(m => m.remove());
-}
-
+function openMapFromTable(ri) { openMap("single", ri); }
+function clearMarkers() { document.querySelectorAll("#mapContainer .marker").forEach(m=>m.remove()); }
 function closeMap() {
   document.getElementById("mapOverlay").style.display = "none";
   document.getElementById("mapPopup").style.display = "none";
-
-  if (mapMode === "input") {
-    if (aktuellerPunkt) e.koord = aktuellerPunkt;
-    e.ort = "Prad";
-    zeigeSeite("zeit");
-  }
-  // bei "view"/"single" bleibt die aktuelle Seite erhalten
+  if (mapMode==="input") { if (aktuellerPunkt) e.koord=aktuellerPunkt; e.ort="Prad"; zeigeSeite("wf-zeit"); }
 }
-
-function drawMarker(xPct, yPct, wildart) {
-  const container = document.getElementById("mapContainer");
-  const marker = document.createElement("div");
-  marker.className = "marker";
-
-  const colors = {
-    "Rehwild": "yellow",
-    "Rotwild": "red",
-    "Gamswild": "#888"
-  };
-  marker.style.background = colors[wildart] || "blue";
-
-  marker.style.left = (xPct * 100) + "%";
-  marker.style.top  = (yPct * 100) + "%";
-
-  container.appendChild(marker);
+function drawMarker(x,y,w) {
+  const c=document.getElementById("mapContainer"), m=document.createElement("div");
+  m.className="marker";
+  const cl={"Rehwild":"yellow","Rotwild":"red","Gamswild":"#888"};
+  m.style.background=cl[w]||"blue";
+  m.style.left=(x*100)+"%"; m.style.top=(y*100)+"%";
+  c.appendChild(m);
 }
-
-/* Klick auf Karte -> Koordinate in % speichern */
-document.getElementById("mapImage").addEventListener("click", function (ev) {
-  if (mapMode !== "input") return;
-  const rect = this.getBoundingClientRect();
-  const xPct = (ev.clientX - rect.left) / rect.width;
-  const yPct = (ev.clientY - rect.top)  / rect.height;
-  aktuellerPunkt = { x: xPct, y: yPct };
-  clearMarkers();
-  drawMarker(xPct, yPct, e.wildart);
+document.getElementById("mapImage").addEventListener("click", function(ev) {
+  if (mapMode!=="input") return;
+  const r=this.getBoundingClientRect();
+  aktuellerPunkt = { x:(ev.clientX-r.left)/r.width, y:(ev.clientY-r.top)/r.height };
+  clearMarkers(); drawMarker(aktuellerPunkt.x, aktuellerPunkt.y, e.wildart);
 });
 
 /* ============================================================
-   TABELLE
+   ANZEIGE
    ============================================================ */
-
 function anzeigen() {
+  updateStats(); applyConfig();
+  const fd = getFiltered();
+
+  // Desktop
   const t = document.getElementById("tabelle");
+  const adminCol = isAdmin ? '<th>Admin</th>' : '';
   t.innerHTML = `<tr>
-    <th>Name</th><th>Wildart</th><th>Wild</th><th>kg</th><th>Ort</th>
-    <th>Schusszeit</th><th>Eingelagert</th><th>Entnommen</th>
-    <th>Verwendung</th><th>Abfall</th><th></th>
+    <th>Erleger</th><th>Wildart</th><th>Detail</th><th>kg</th>
+    <th>Ort</th><th>Zeit</th><th>Datum</th><th>Entnommen</th>
+    <th>Verwend.</th><th>Abfall</th>${adminCol}
   </tr>`;
 
-  daten.forEach((d, i) => {
+  fd.forEach((d,fi) => {
+    const ri = realIdx(fi);
     const r = t.insertRow();
-    r.insertCell().innerText = d.name || "";
-    r.insertCell().innerText = d.wildart || "";
-    r.insertCell().innerText = d.wild || "";
-    r.insertCell().innerText = d.gewicht || "";
+    r.insertCell().innerText = d.name||"";
+    r.insertCell().innerText = d.wildart||"";
+    r.insertCell().innerText = d.wild||"";
+    r.insertCell().innerText = d.gewicht||"";
 
-    const ortCell = r.insertCell();
-    if (d.ort === "Prad" && d.koord) {
-      ortCell.innerHTML =
-        `<span style="color:blue;cursor:pointer;text-decoration:underline;"
-               onclick="openMapFromTable(${i})">Prad (Karte)</span>`;
-    } else {
-      ortCell.innerText = d.ort || "";
-    }
+    const oc = r.insertCell();
+    if (d.ort==="Prad" && d.koord) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>`;
+    else oc.innerText = d.ort||"";
 
-    r.insertCell().innerText = d.zeit || "";
+    r.insertCell().innerText = d.zeit||"";
     r.insertCell().innerText = formatDatum(d.datum);
 
-    /* Entnommen */
-    const ent = r.insertCell();
+    // Entnommen
+    const ec = r.insertCell();
     if (!d.entnommen) {
-      ent.innerHTML =
-        `<span class="entnommen-btn" onclick="openDate(${i})">+</span>
-         <input type="date" id="date${i}" style="display:none;"
-                onchange="setEntnommen(${i}, this.value)">`;
+      ec.innerHTML = `<span class="tag-btn tag-ent" onclick="pickDate(${ri})">+</span>
+        <input type="date" id="dt${ri}" style="display:none;width:auto;" onchange="setEntnommen(${ri},this.value)">`;
     } else {
-      ent.innerText = formatDatum(d.entnommen);
-      ent.className = "entnommen-done";
+      ec.innerText = formatDatum(d.entnommen);
+      ec.style.background = "#e8f5e9";
     }
 
-    r.insertCell().innerText = d.verwendung || "";
+    r.insertCell().innerText = d.verwendung||"";
 
-    /* Abfall */
-    const ab = r.insertCell();
-    if (d.abfall === null || d.abfall === undefined) {
-      ab.innerHTML = `<span class="abfall-btn" onclick="handleAbfall(${i})">+</span>`;
-    } else if (d.abfall === "ja") {
-      ab.innerText = "Ja";
-      ab.className = "abfall-ja";
-    } else {
-      ab.innerText = "Nein";
-      ab.className = "abfall-nein";
+    // Abfall
+    const ac = r.insertCell();
+    if (d.abfall==null) ac.innerHTML = `<span class="tag-btn tag-abf" onclick="handleAbfall(${ri})">+</span>`;
+    else if (d.abfall==="ja") ac.innerHTML = `<span class="tag-btn tag-ja">Ja</span>`;
+    else ac.innerHTML = `<span class="tag-btn tag-nein">Nein</span>`;
+
+    // Admin column
+    if (isAdmin) {
+      r.insertCell().innerHTML =
+        `<span class="tag-btn tag-edit" onclick="openEdit(${ri})">✏️</span> ` +
+        `<span class="tag-btn tag-del" onclick="loeschen(${ri})">✕</span>`;
     }
-
-    /* Löschen */
-    const del = r.insertCell();
-    del.innerHTML = `<span class="del-btn" onclick="loescheEintrag(${i})">✕</span>`;
   });
-}
 
-function formatDatum(d) {
-  if (!d) return "";
-  const date = new Date(d);
-  if (isNaN(date)) return "";
-  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
-}
+  // Mobile Cards
+  const cc = document.getElementById("cardsContainer");
+  cc.innerHTML = "";
+  fd.forEach((d,fi) => {
+    const ri = realIdx(fi);
+    const card = document.createElement("div");
+    card.className = "card";
+    const wt = d.wildart + (d.wild ? " – "+d.wild : "");
+    const ortH = (d.ort==="Prad"&&d.koord) ? `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>` : esc(d.ort||"");
 
-function openDate(i) {
-  const el = document.getElementById("date" + i);
-  if (el.showPicker) el.showPicker();
-  else { el.style.display = "block"; el.focus(); }
-}
+    let entH = !d.entnommen
+      ? `<span class="tag-btn tag-ent" onclick="pickDate(${ri})">+ Entnahme</span><input type="date" id="mdt${ri}" style="display:none;" onchange="setEntnommen(${ri},this.value)">`
+      : `<span class="tag-btn tag-done">${formatDatum(d.entnommen)}</span>`;
 
-function setEntnommen(i, val) {
-  if (val) {
-    daten[i].entnommen = val;
-    speichern();
-    anzeigen();
+    let abfH = d.abfall==null
+      ? `<span class="tag-btn tag-abf" onclick="handleAbfall(${ri})">+ Abfall</span>`
+      : d.abfall==="ja"
+        ? `<span class="tag-btn tag-ja">Abfall: Ja</span>`
+        : `<span class="tag-btn tag-nein">Abfall: Nein</span>`;
+
+    let adminH = isAdmin
+      ? `<span class="tag-btn tag-edit" onclick="openEdit(${ri})">✏️</span> <span class="tag-btn tag-del" onclick="loeschen(${ri})">✕</span>`
+      : '';
+
+    card.innerHTML = `
+      <div class="card-head">
+        <strong>${esc(wt)}</strong>
+        <span>${adminH}</span>
+      </div>
+      <div class="card-grid">
+        <div><span class="label">Erleger</span><br>${esc(d.name||"")}</div>
+        <div><span class="label">Gewicht</span><br>${d.gewicht ? d.gewicht+" kg" : "–"}</div>
+        <div><span class="label">Ort</span><br>${ortH}</div>
+        <div><span class="label">Zeit</span><br>${esc(d.zeit||"")}</div>
+        <div><span class="label">Datum</span><br>${formatDatum(d.datum)}</div>
+        <div><span class="label">Verwendung</span><br>${esc(d.verwendung||"–")}</div>
+      </div>
+      <div class="card-actions">${entH} ${abfH}</div>`;
+    cc.appendChild(card);
+  });
+
+  if (!fd.length) {
+    const msg = "Keine Einträge für " + selectedYear;
+    cc.innerHTML = `<p style="text-align:center;color:var(--grau);padding:20px;">${msg}</p>`;
+    const r = t.insertRow(), c = r.insertCell();
+    c.colSpan = isAdmin ? 11 : 10;
+    c.style.cssText = "color:#999;padding:20px;";
+    c.textContent = msg;
   }
 }
 
-function handleAbfall(i) {
-  const overlay = document.createElement("div");
-  overlay.className = "popup-overlay";
-  overlay.onclick = () => { overlay.remove(); box.remove(); };
-
-  const box = document.createElement("div");
-  box.className = "popup";
-  box.innerHTML = `
-    <h3>Abfall</h3>
-    <p>ACHTUNG: Abfall nur während Parkjagd.</p>
-    <button onclick="setAbfall(${i}, 'ja')">Ja</button>
-    <button class="danger" onclick="setAbfall(${i}, 'nein')">Nein</button>
-  `;
-  document.body.appendChild(overlay);
-  document.body.appendChild(box);
+/* ---------- Helpers ---------- */
+function formatDatum(d) {
+  if (!d) return "";
+  const dt = new Date(d);
+  if (isNaN(dt)) return "";
+  return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'+dt.getFullYear();
 }
+function esc(s) { const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
 
-function setAbfall(i, val) {
-  daten[i].abfall = val;
-  speichern();
-  anzeigen();
+function pickDate(i) {
+  let el = document.getElementById("dt"+i) || document.getElementById("mdt"+i);
+  if (!el) return;
+  if (el.showPicker) el.showPicker();
+  else { el.style.display="block"; el.focus(); }
+}
+function setEntnommen(i,val) { if (val) { daten[i].entnommen=val; speichern(); anzeigen(); } }
+
+function handleAbfall(i) {
+  const ov = document.createElement("div"); ov.className="popup-overlay";
+  ov.onclick = () => { ov.remove(); box.remove(); };
+  const box = document.createElement("div"); box.className="popup";
+  box.innerHTML = `<h3>Abfall</h3>
+    <p style="margin:10px 0;">${esc(config.abfallText)}</p>
+    <button onclick="setAbfall(${i},'ja')">✅ Ja</button>
+    <button class="danger" onclick="setAbfall(${i},'nein')">❌ Nein</button>`;
+  document.body.appendChild(ov); document.body.appendChild(box);
+}
+function setAbfall(i,val) { daten[i].abfall=val; speichern(); anzeigen(); closePopups(); }
+
+function closePopups() {
   document.querySelectorAll(".popup, .popup-overlay").forEach(el => {
-    if (el.id !== "mapPopup" && el.id !== "mapOverlay") el.remove();
+    if (el.id!=="mapPopup" && el.id!=="mapOverlay") el.remove();
   });
 }
 
-function loescheEintrag(i) {
+/* ---------- Löschen: NUR Admin ---------- */
+function loeschen(i) {
+  if (!isAdmin) return alert("Nur der Admin kann Einträge löschen.");
   if (!confirm("Eintrag wirklich löschen?")) return;
-  daten.splice(i, 1);
-  speichern();
-  anzeigen();
+  daten.splice(i,1); speichern(); updateYearTabs(); anzeigen();
 }
 
 /* ============================================================
-   EXPORT / IMPORT (JSON-Backup)
+   ADMIN: EINTRAG BEARBEITEN
    ============================================================ */
+function openEdit(i) {
+  if (!isAdmin) return;
+  const d = daten[i];
+  const abfV = (d.abfall==null) ? "" : d.abfall;
 
+  const ov = document.createElement("div"); ov.className="popup-overlay";
+  ov.onclick = () => { ov.remove(); box.remove(); };
+  const box = document.createElement("div"); box.className="popup";
+  box.innerHTML = `
+    <h3>✏️ Eintrag bearbeiten</h3>
+    <div class="edit-row"><label>Erleger</label><input id="ed_name" value="${esc(d.name||"")}"></div>
+    <div class="edit-row"><label>Wildart</label><input id="ed_wildart" value="${esc(d.wildart||"")}"></div>
+    <div class="edit-row"><label>Detail</label><input id="ed_wild" value="${esc(d.wild||"")}"></div>
+    <div class="edit-row"><label>Gewicht (kg)</label><input id="ed_gew" type="number" min="0" max="200" value="${d.gewicht||""}"></div>
+    <div class="edit-row"><label>Ort</label><input id="ed_ort" value="${esc(d.ort||"")}"></div>
+    <div class="edit-row"><label>Schusszeit</label><input id="ed_zeit" type="time" value="${d.zeit||""}"></div>
+    <div class="edit-row"><label>Datum (Einlagerung)</label><input id="ed_datum" type="date" value="${d.datum||""}"></div>
+    <div class="edit-row">
+      <label>Entnommen</label>
+      <input id="ed_ent" type="date" value="${d.entnommen||""}">
+      <button class="sm sec" onclick="document.getElementById('ed_ent').value=''" style="margin-top:4px;">↩ Entnahme zurücksetzen</button>
+    </div>
+    <div class="edit-row">
+      <label>Verwendung</label>
+      <select id="ed_verw">
+        <option value="">–</option>
+        <option value="Eigengebrauch" ${d.verwendung==="Eigengebrauch"?"selected":""}>Eigengebrauch</option>
+        <option value="Verkauf" ${d.verwendung==="Verkauf"?"selected":""}>Verkauf</option>
+      </select>
+    </div>
+    <div class="edit-row">
+      <label>Abfall</label>
+      <select id="ed_abf">
+        <option value="" ${abfV===""?"selected":""}>– nicht gesetzt –</option>
+        <option value="ja" ${abfV==="ja"?"selected":""}>Ja</option>
+        <option value="nein" ${abfV==="nein"?"selected":""}>Nein</option>
+      </select>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button onclick="saveEdit(${i})" style="flex:1;">💾 Speichern</button>
+      <button class="sec" onclick="closePopups()" style="flex:1;">Abbrechen</button>
+    </div>`;
+  document.body.appendChild(ov); document.body.appendChild(box);
+}
+
+function saveEdit(i) {
+  const d = daten[i];
+  d.name = document.getElementById("ed_name").value.trim();
+  d.wildart = document.getElementById("ed_wildart").value.trim();
+  d.wild = document.getElementById("ed_wild").value.trim();
+  d.gewicht = document.getElementById("ed_gew").value;
+  d.ort = document.getElementById("ed_ort").value.trim();
+  d.zeit = document.getElementById("ed_zeit").value;
+  d.datum = document.getElementById("ed_datum").value;
+  d.entnommen = document.getElementById("ed_ent").value;
+  d.verwendung = document.getElementById("ed_verw").value;
+  const a = document.getElementById("ed_abf").value;
+  d.abfall = a==="" ? null : a;
+  speichern(); closePopups(); updateYearTabs(); anzeigen();
+}
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+function showLogin() {
+  isAdmin ? (applyConfig(), zeigeSeite("admin")) : zeigeSeite("admin-login");
+}
+
+function doLogin() {
+  const u = document.getElementById("adminUser").value.trim();
+  const p = document.getElementById("adminPass").value;
+  if (u==="admin" && p===config.pass) { isAdmin=true; applyConfig(); zeigeSeite("admin"); }
+  else alert("Falsche Zugangsdaten!");
+  document.getElementById("adminPass").value = "";
+}
+
+function adminLogout() { isAdmin=false; applyConfig(); anzeigen(); }
+function adminToRevier() { applyConfig(); anzeigen(); zeigeSeite("revier"); }
+function adminLogoutFull() { isAdmin=false; applyConfig(); anzeigen(); zeigeSeite("start"); }
+
+function saveConfig() {
+  config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdrevier Prad";
+  config.code = document.getElementById("cfgCode").value.trim() || "1024";
+  config.mapUrl = document.getElementById("cfgMapUrl").value.trim() || config.mapUrl;
+  config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
+  saveCfg(); applyConfig();
+  alert("Einstellungen gespeichert!");
+}
+
+function changePassword() {
+  const np = document.getElementById("cfgNewPass").value;
+  if (!np || np.length<4) return alert("Passwort muss mind. 4 Zeichen haben!");
+  config.pass = np; saveCfg();
+  document.getElementById("cfgNewPass").value = "";
+  alert("Passwort geändert!");
+}
+
+function clearYearData() {
+  if (!confirm("Alle Einträge von "+selectedYear+" wirklich löschen?")) return;
+  daten = daten.filter(d => !d.datum || new Date(d.datum).getFullYear()!==selectedYear);
+  speichern(); updateYearTabs(); anzeigen();
+  alert("Daten für "+selectedYear+" gelöscht.");
+}
+
+function clearAllData() {
+  if (!confirm("ALLE Daten unwiderruflich löschen?")) return;
+  if (!confirm("Wirklich ALLE? Nicht rückgängig!")) return;
+  daten=[]; speichern(); updateYearTabs(); anzeigen();
+  alert("Alle Daten gelöscht.");
+}
+
+/* ---------- Export / Import ---------- */
 function exportJSON() {
-  const blob = new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
+  const b = new Blob([JSON.stringify(daten,null,2)], {type:"application/json"});
+  const u = URL.createObjectURL(b);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = "abschussliste_" + new Date().toISOString().slice(0, 10) + ".json";
-  a.click();
-  URL.revokeObjectURL(url);
+  a.href=u; a.download="abschussliste_"+selectedYear+"_"+new Date().toISOString().slice(0,10)+".json";
+  a.click(); URL.revokeObjectURL(u);
 }
 
 function importJSON(ev) {
-  const file = ev.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
+  const f = ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
     try {
-      const parsed = JSON.parse(reader.result);
-      if (!Array.isArray(parsed)) throw new Error("Kein Array");
-      if (!confirm("Importierte Daten ersetzen die aktuelle Liste. Fortfahren?")) return;
-      daten = parsed;
-      speichern();
-      anzeigen();
-      alert("Import erfolgreich: " + daten.length + " Einträge.");
-    } catch (err) {
-      alert("Fehler beim Import: " + err.message);
-    }
+      const p = JSON.parse(r.result);
+      if (!Array.isArray(p)) throw new Error("Kein Array");
+      if (!confirm("Import ersetzt aktuelle Liste. Fortfahren?")) return;
+      daten=p; speichern(); updateYearTabs(); anzeigen();
+      alert("Import: "+daten.length+" Einträge.");
+    } catch(e) { alert("Fehler: "+e.message); }
   };
-  reader.readAsText(file);
-  ev.target.value = "";
+  r.readAsText(f); ev.target.value="";
 }
 
-/* --- Start --- */
-anzeigen();
-</script>
+/* ---------- Auto-Advance ---------- */
+document.getElementById("inputZeit").addEventListener("change", () => setTimeout(nextDatum, 300));
+document.getElementById("inputDatum").addEventListener("change", () => setTimeout(nextVerwendung, 300));
 
+/* ---------- Start ---------- */
+init();
+</script>
 </body>
 </html>
