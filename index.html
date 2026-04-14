@@ -363,6 +363,7 @@ tr:hover { background: var(--gruen-l); }
   <div class="topbar">
     <button onclick="neuerEintrag()">➕ Neuer Eintrag</button>
     <button onclick="openMapAll()">🗺️ Karte</button>
+    <button onclick="openPlanPopup()">📋 Plan</button>
     <button class="sec" onclick="zeigeSeite('start')">⬅ Zurück</button>
   </div>
   <div class="table-wrapper"><table id="tabelle"></table></div>
@@ -593,6 +594,14 @@ tr:hover { background: var(--gruen-l); }
   </div>
   <p class="hint" id="mapHint">Tippe auf die Karte, um den Abschussort zu markieren.</p>
   <button class="full" onclick="closeMap()">OK</button>
+</div>
+
+<!-- PLAN POPUP -->
+<div id="planOverlay" class="popup-overlay" style="display:none;" onclick="closePlanPopup()"></div>
+<div id="planPopup" class="popup" style="display:none;max-width:560px;">
+  <h3>📋 Abschussplan <span id="planPopupYear" style="font-weight:normal;font-size:14px;"></span></h3>
+  <div id="planPopupBody"></div>
+  <button class="full" onclick="closePlanPopup()">Schließen</button>
 </div>
 
 <script>
@@ -883,11 +892,25 @@ function updateStats() {
   Object.keys(counts).sort().forEach(k => {
     h += `<div class="stat-box"><div class="num">${counts[k]}</div><div class="lbl">${esc(k)}</div></div>`;
   });
-  h += renderPlanIstTabelle(fd, selectedYear);
   document.getElementById("statsContainer").innerHTML = h;
 }
 
-/* Plan vs. Ist vs. Rest als kompakte Tabelle unter den Kacheln */
+/* Popup: Abschussplan für das gewählte Jahr anzeigen */
+async function openPlanPopup() {
+  await ensurePlan(selectedYear);
+  const fd = getFiltered();
+  document.getElementById("planPopupYear").textContent = "· Jagdjahr " + selectedYear;
+  document.getElementById("planPopupBody").innerHTML = renderPlanIstTabelle(fd, selectedYear);
+  document.getElementById("planOverlay").style.display = "block";
+  document.getElementById("planPopup").style.display = "block";
+}
+
+function closePlanPopup() {
+  document.getElementById("planOverlay").style.display = "none";
+  document.getElementById("planPopup").style.display = "none";
+}
+
+/* Plan vs. Ist vs. Rest – wird vom Popup aufgerufen */
 function renderPlanIstTabelle(fd, year) {
   const plan = getPlan(year);
 
