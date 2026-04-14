@@ -312,12 +312,6 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="zeigeSeite('park')">🌲 Park</button>
     <button onclick="zeigeSeite('revier')">🎯 Revier</button>
   </div>
-  <div class="topbar">
-    <button class="sec" onclick="exportJSON()">📤 Export</button>
-    <button class="sec" onclick="document.getElementById('importFile').click()">📥 Import</button>
-    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importJSON(event)">
-  </div>
-  <button class="sec full" onclick="showLogin()" style="margin-top:6px;" id="btnAdminStart">🔐 Admin</button>
 </div>
 
 <!-- PARK -->
@@ -1518,35 +1512,7 @@ async function changePassword() {
   }
 }
 
-async function clearYearData() {
-  if (!isAdmin) return alert("Nur der Admin.");
-  if (!confirm("Alle Einträge von " + selectedYear + " wirklich löschen?")) return;
-  const toDelete = daten.filter(d => d.datum && new Date(d.datum).getFullYear() === selectedYear);
-  let failed = 0;
-  for (const d of toDelete) {
-    try { await api.deleteEintrag(d.id); }
-    catch (_) { failed++; }
-  }
-  await reloadDaten();
-  updateYearTabs(); anzeigen();
-  alert("Daten für " + selectedYear + " gelöscht." + (failed ? " (" + failed + " Fehler)" : ""));
-}
-
-async function clearAllData() {
-  if (!isAdmin) return alert("Nur der Admin.");
-  if (!confirm("ALLE Daten unwiderruflich löschen?")) return;
-  if (!confirm("Wirklich ALLE? Nicht rückgängig!")) return;
-  let failed = 0;
-  for (const d of [...daten]) {
-    try { await api.deleteEintrag(d.id); }
-    catch (_) { failed++; }
-  }
-  await reloadDaten();
-  updateYearTabs(); anzeigen();
-  alert("Alle Daten gelöscht." + (failed ? " (" + failed + " Fehler)" : ""));
-}
-
-/* ---------- Export / Import ---------- */
+/* ---------- Export (CSV für Jahresmeldung) ---------- */
 function exportExcel() {
   const year = document.getElementById("exportYear").value;
 
@@ -1583,32 +1549,6 @@ function exportExcel() {
   a.click();
 
   URL.revokeObjectURL(url);
-}
-
-function importJSON(ev) {
-  const f = ev.target.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = async () => {
-    try {
-      const list = JSON.parse(r.result);
-      if (!Array.isArray(list)) throw new Error("Kein Array");
-      if (!isAdmin) { alert("Nur der Admin kann importieren."); return; }
-      if (!confirm("Import legt " + list.length + " Einträge an. Fortfahren?")) return;
-      let ok = 0, fail = 0;
-      for (const d of list) {
-        try {
-          // Einträge im alten Format (mit d.koord statt koord_x/y) werden gemappt
-          const body = clientToDb({ ...d, gemeldet: false });
-          await api.createEintrag(body);
-          ok++;
-        } catch (_) { fail++; }
-      }
-      await reloadDaten();
-      updateYearTabs(); anzeigen();
-      alert("Import: " + ok + " ok, " + fail + " Fehler.");
-    } catch(e) { alert("Fehler: " + e.message); }
-  };
-  r.readAsText(f); ev.target.value = "";
 }
 
 /* ---------- Auto-Advance ---------- */
