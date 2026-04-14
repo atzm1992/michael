@@ -1704,18 +1704,34 @@ function openMap(mode, idOrNull) {
   document.getElementById("mapPopup").style.display = "block";
   document.getElementById("mapHint").style.display = mode === "input" ? "block" : "none";
 
-  // Leaflet braucht beim allerersten Init korrekte Dimensionen; wenn der
-  // Popup-Container gerade erst display:block bekommt, sind die noch 0.
-  // -> Erst zwei Frames warten, dann initialisieren und mehrfach
-  // invalidateSize() aufrufen, falls das Layout nachwirkt.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  // Auf Mobile kann es einen Moment dauern, bis der Popup-Container
+  // seine endgültigen Dimensionen hat. Wir warten bis der Container
+  // eine messbare Größe hat und erzeugen die Karte erst dann.
+  waitForContainerSize("mapContainer", () => {
     const map = ensureLeaflet();
     map.invalidateSize(true);
-    setTimeout(() => map.invalidateSize(true), 100);
-    setTimeout(() => map.invalidateSize(true), 300);
-    setTimeout(() => map.invalidateSize(true), 600);
+    // Nochmal nachinvalidieren, falls Layout nachwirkt
+    setTimeout(() => map.invalidateSize(true), 150);
+    setTimeout(() => map.invalidateSize(true), 450);
     setupMapMarkers(mode);
-  }));
+  });
+}
+
+/* Wartet, bis der Container-Div messbare Dimensionen hat,
+   dann ruft er cb() auf. Fallback nach 1s, damit es nie ewig hängt. */
+function waitForContainerSize(id, cb) {
+  const el = document.getElementById(id);
+  let tries = 0;
+  function check() {
+    const r = el ? el.getBoundingClientRect() : null;
+    if (r && r.width > 0 && r.height > 0) {
+      cb();
+      return;
+    }
+    if (tries++ > 20) { cb(); return; } // ~1s Fallback
+    requestAnimationFrame(check);
+  }
+  requestAnimationFrame(check);
 }
 
 function setupMapMarkers(mode) {
@@ -1804,6 +1820,17 @@ function closeMap() {
     zeigeSeite("wf-zeit");
   }
   aktuellerPunkt = null;
+  // Map komplett zerstören, damit sie beim nächsten Öffnen frisch
+  // und mit korrekten Container-Dimensionen initialisiert wird.
+  // Das fixt vor allem mobile Probleme, wo invalidateSize() allein
+  // nicht reicht.
+  if (leafletMap) {
+    try { leafletMap.remove(); } catch (_) {}
+    leafletMap = null;
+    leafletEntryLayer = null;
+    leafletTempMarker = null;
+    leafletClickHandler = null;
+  }
 }
 
 /* Karten-Aktionen: Standort / Zentrieren */

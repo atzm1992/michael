@@ -11,7 +11,7 @@
  *      Fehlerantwort, die der Client interpretieren kann.
  */
 
-const CACHE_NAME = 'jagdrevier-prad-v5';
+const CACHE_NAME = 'jagdrevier-prad-v6';
 const APP_SHELL = [
   './',
   './index.html',
@@ -24,8 +24,6 @@ const APP_SHELL = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      // Cache.addAll schlägt fehl, wenn eine einzelne URL nicht erreichbar
-      // ist – darum einzeln und Fehler ignorieren.
       return Promise.all(
         APP_SHELL.map(url =>
           cache.add(url).catch(err => console.warn('SW cache miss:', url, err))
@@ -51,23 +49,16 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // API-Anfragen immer direkt ans Netz; der Client kümmert sich selbst
-  // um Retry/Queue bei Offline.
-  if (url.pathname.startsWith('/api/')) {
+  // OSM-Tiles NICHT anfassen – der Browser macht das Tile-Caching
+  // selber, und ein SW-Intercept kann zu opaquen Responses führen,
+  // die dann auf Mobile nicht gerendert werden.
+  if (url.hostname.endsWith('tile.openstreetmap.org')) {
     return; // Default: Browser macht normales Fetch
   }
 
-  // OSM-Tiles: Network-first, mit Cache-Fallback
-  if (url.hostname.endsWith('tile.openstreetmap.org')) {
-    event.respondWith(
-      fetch(req)
-        .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(req, copy)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match(req))
-    );
+  // API-Anfragen immer direkt ans Netz; der Client kümmert sich selbst
+  // um Retry/Queue bei Offline.
+  if (url.pathname.startsWith('/api/')) {
     return;
   }
 
@@ -84,8 +75,6 @@ self.addEventListener('fetch', event => {
           }
           return res;
         }).catch(() => {
-          // Offline-Fallback für Navigation: index.html liefern, damit
-          // die App trotzdem geladen werden kann.
           if (req.mode === 'navigate') return caches.match('./index.html');
         });
       })
