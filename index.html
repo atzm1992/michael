@@ -3156,6 +3156,12 @@ function updateBottomNav() {
   nav.style.display = hidden ? "none" : "flex";
   document.body.classList.toggle("has-bottom-nav", !hidden);
 
+  // FAB nur anzeigen, wenn wir in der Revier- oder Park-Liste sind -
+  // sonst wüsste der User nicht, in welchem Bereich der Eintrag
+  // angelegt wird.
+  const fab = nav.querySelector(".bn-fab");
+  if (fab) fab.style.display = (pageId === "revier") ? "" : "none";
+
   // Aktiven Button markieren
   nav.querySelectorAll("button[data-page]").forEach(btn => {
     const p = btn.dataset.page;
