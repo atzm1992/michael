@@ -1319,14 +1319,25 @@ function renderMeldListe() {
 
 async function toggleGemeldet(id) {
   const d = daten.find(x => x.id === id);
-  if (!d) return;
+  if (!d) { alert("Eintrag #" + id + " nicht gefunden."); return; }
   try {
-    const row = await api.eintragAction(id, 'gemeldet', !d.gemeldet);
+    // Server erwartet truthy/falsy; explizit als 1/0 schicken, damit
+    // es unabhängig vom Wahrheitswert eindeutig ist.
+    const neu = d.gemeldet ? 0 : 1;
+    const row = await api.eintragAction(id, 'gemeldet', neu);
     applyRow(row);
     renderMeldListe();
     anzeigen();
   } catch (err) {
-    alert("Speichern fehlgeschlagen: " + err.message);
+    if (String(err.message).includes('Nicht eingeloggt') ||
+        String(err.message).includes('Nur für Admin')) {
+      alert("Admin-Session abgelaufen. Bitte oben rechts neu einloggen.");
+      isAdmin = false;
+      applyConfig();
+      zeigeSeite('admin-login');
+    } else {
+      alert("Speichern fehlgeschlagen: " + err.message);
+    }
   }
 }
 
@@ -1447,7 +1458,15 @@ function showSummary() {
 }
 
 function editFromSummary() {
-  document.getElementById("inputName").value = e.name||"";
+  // Alle Workflow-Felder aus dem aktuellen Eintrag vorausfüllen,
+  // damit der User wirklich editieren und nicht neu anfangen muss.
+  document.getElementById("inputName").value   = e.name   || "";
+  document.getElementById("andereInput").value = "";
+  document.getElementById("inputGewicht").value = (e.gewicht != null ? e.gewicht : "");
+  document.getElementById("inputOrt").value    = (e.ort && e.ort !== "Prad") ? e.ort : "";
+  document.getElementById("inputZeit").value   = e.zeit   || "";
+  document.getElementById("inputDatum").value  = e.datum  || "";
+  document.getElementById("andereOrtBox").style.display = "none";
   zeigeSeite("wf-name");
 }
 
@@ -1696,7 +1715,7 @@ function anzeigen() {
     r.insertCell().innerText = d.gewicht||"";
 
     const oc = r.insertCell();
-    if (d.ort==="Prad" && d.latlng) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>`;
+    if (d.latlng) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`;
     else oc.innerText = d.ort||"";
 
     r.insertCell().innerText = d.zeit||"";
@@ -1736,7 +1755,9 @@ function anzeigen() {
     const card = document.createElement("div");
     card.className = "card" + (d.gemeldet ? " card-gemeldet" : "");
     const wt = (d.gemeldet ? "🔒 " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
-    const ortH = (d.ort==="Prad"&&d.latlng) ? `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>` : esc(d.ort||"");
+    const ortH = d.latlng
+      ? `<span class="link" onclick="openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`
+      : esc(d.ort||"");
 
     let entH = !d.entnommen
       ? `<span class="tag-btn tag-ent" onclick="pickDate(${ri})">+ Entnahme</span><input type="date" id="mdt${ri}" style="display:none;" onchange="setEntnommen(${ri},this.value)">`
@@ -1809,9 +1830,13 @@ async function setEntnommen(id, val) {
 
 function handleAbfall(id) {
   if (istGesperrt(id)) return alertGesperrt();
-  const ov = document.createElement("div"); ov.className="popup-overlay";
+  const ov = document.createElement("div");
+  ov.className = "popup-overlay";
+  ov.style.cssText = "display:block;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;";
+  const box = document.createElement("div");
+  box.className = "popup";
+  box.style.cssText = "display:block;z-index:1000;";
   ov.onclick = () => { ov.remove(); box.remove(); };
-  const box = document.createElement("div"); box.className="popup";
   box.innerHTML = `<h3>Abfall</h3>
     <p style="margin:10px 0;">${esc(config.abfallText)}</p>
     <button onclick="setAbfall(${id},'ja')">✅ Ja</button>
@@ -1859,14 +1884,18 @@ async function loeschen(id) {
    ADMIN: EINTRAG BEARBEITEN
    ============================================================ */
 function openEdit(id) {
-  if (!isAdmin) return;
+  if (!isAdmin) { alert("Nur der Admin kann Einträge bearbeiten."); return; }
   const d = daten.find(x => x.id === id);
-  if (!d) return;
+  if (!d) { alert("Eintrag #" + id + " nicht gefunden."); return; }
   const abfV = (d.abfall == null) ? "" : d.abfall;
 
-  const ov = document.createElement("div"); ov.className="popup-overlay";
+  const ov = document.createElement("div");
+  ov.className = "popup-overlay";
+  ov.style.cssText = "display:block;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;";
+  const box = document.createElement("div");
+  box.className = "popup";
+  box.style.cssText = "display:block;z-index:1000;";
   ov.onclick = () => { ov.remove(); box.remove(); };
-  const box = document.createElement("div"); box.className="popup";
   box.innerHTML = `
     <h3>✏️ Eintrag bearbeiten</h3>
     <div class="edit-row"><label>Erleger</label><input id="ed_name" value="${esc(d.name||"")}"></div>
