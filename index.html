@@ -466,7 +466,7 @@ tr:hover { background: var(--gruen-l); }
 <!-- REVIER -->
 <div id="revier" class="page">
   <div class="header">
-    <img src="491438944_10226782024328158_4391837002889702168_n.jpg"
+    <img src="logo.jpg"
          alt="" style="width:60px;" onerror="this.style.display='none'">
     <h2 id="revierTitle">Jagdrevier Prad</h2>
     <div id="adminIndicator" style="display:none;">
@@ -848,6 +848,7 @@ let e = {};
 let aktuellerPunkt = null;
 let mapMode = "input";
 let viewIndex = null;
+let singleViewEntry = null;   // beim Single-View per Tabellenklick gesetzt
 let selectedYear = new Date().getFullYear();
 let isAdmin = false;
 let currentUser = null;
@@ -1755,20 +1756,44 @@ function setupMapMarkers(mode) {
       map.setView(PRAD_CENTER, PRAD_ZOOM);
     }
   } else if (mode === "single") {
-    const d = daten.find(x => x.id === viewIndex);
-    console.log('[Karte] single: id=' + viewIndex + ', gefunden=' + !!d + ', latlng=', d && d.latlng);
+    // Wir nutzen den beim Klick gestashten Eintrag (siehe openMapFromTable),
+    // fallback ist daten.find für den Fall, dass setupMapMarkers direkt
+    // mit einer id aufgerufen wird.
+    let d = singleViewEntry;
+    if (!d && viewIndex != null) {
+      d = daten.find(x => x.id === viewIndex)
+       || daten.find(x => String(x.id) === String(viewIndex));
+    }
+    console.log('[Karte] single setup: d=', d, 'validLL=', d && validLL(d.latlng));
     if (d && validLL(d.latlng)) {
       L.marker(d.latlng, { icon: makeDivIcon(d.wildart) })
         .bindTooltip(`${d.name}: ${d.wildart} ${d.wild||''}`)
         .addTo(leafletEntryLayer);
-      map.setView([d.latlng.lat, d.latlng.lng], 15);
+      // setView muss MANCHMAL zweimal aufgerufen werden, weil Leaflet
+      // bei invalidateSize-Sequenzen die erste Anweisung verschluckt.
+      const ll = [d.latlng.lat, d.latlng.lng];
+      map.setView(ll, 15, { animate: false });
+      setTimeout(() => map.setView(ll, 15, { animate: false }), 250);
     } else {
       map.setView(PRAD_CENTER, PRAD_ZOOM);
     }
   }
 }
 function openMapAll() { openMap("view"); }
-function openMapFromTable(id) { openMap("single", id); }
+function openMapFromTable(id) {
+  // Eintrag SOFORT beim Klick stashen, damit setupMapMarkers nicht mehr
+  // auf daten.find angewiesen ist. So geht es auch dann, wenn sich
+  // zwischen Klick und setupMapMarkers irgendwas an der Liste ändert.
+  singleViewEntry = daten.find(x => x.id === id) || null;
+  if (!singleViewEntry) {
+    // Fallback: Typ-lose Suche (falls id als String im DOM steht)
+    singleViewEntry = daten.find(x => String(x.id) === String(id)) || null;
+  }
+  console.log('[Karte] openMapFromTable id=', id, 'typ=', typeof id,
+              'gefunden=', !!singleViewEntry,
+              'latlng=', singleViewEntry && singleViewEntry.latlng);
+  openMap("single", id);
+}
 
 function closeMap() {
   document.getElementById("mapOverlay").style.display = "none";
