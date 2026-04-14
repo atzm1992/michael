@@ -102,6 +102,8 @@ function ensureSchema(): void {
           ort         VARCHAR(100),
           koord_x     DECIMAL(8,6) NULL,
           koord_y     DECIMAL(8,6) NULL,
+          koord_lat   DECIMAL(10,7) NULL,
+          koord_lng   DECIMAL(10,7) NULL,
           zeit        VARCHAR(5),
           datum       DATE,
           verwendung  VARCHAR(30),
@@ -115,6 +117,13 @@ function ensureSchema(): void {
           INDEX idx_gemeldet (gemeldet)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    // Migration: falls die Tabelle schon existierte ohne koord_lat/lng,
+    // die Spalten nachträglich hinzufügen (idempotent per try/catch).
+    try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN koord_lat DECIMAL(10,7) NULL AFTER koord_y"); }
+    catch (PDOException $e) { /* column existiert bereits */ }
+    try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN koord_lng DECIMAL(10,7) NULL AFTER koord_lat"); }
+    catch (PDOException $e) { /* column existiert bereits */ }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS abschussplan (
           jahr        INT NOT NULL,
