@@ -362,6 +362,47 @@ tr:hover { background: var(--gruen-l); }
 
 .hint { font-size: 12px; color: #555; margin: 6px 0; }
 
+/* Workflow-Fortschritt (fix oben, zwischen Admin-FAB und Container) */
+.wf-progress {
+  position: sticky;
+  top: 0;
+  z-index: 800;
+  background: rgba(255,255,255,0.95);
+  padding: 8px 12px 6px;
+  margin: -10px -10px 10px;  /* in den Container-Rand hinein */
+  border-bottom: 1px solid #e0e0e0;
+  backdrop-filter: blur(6px);
+}
+.wf-progress-bar {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.wf-progress-fill {
+  height: 100%;
+  background: var(--gruen);
+  transition: width 0.2s ease;
+  width: 0;
+}
+.wf-progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--grau);
+}
+.wf-cancel {
+  background: transparent !important;
+  color: var(--rot) !important;
+  padding: 2px 8px;
+  font-size: 12px;
+  margin: 0;
+  border: 1px solid var(--rot);
+  border-radius: 6px;
+}
+
 /* Toast-Benachrichtigungen */
 .toast-box {
   position: fixed;
@@ -524,6 +565,15 @@ tr:hover { background: var(--gruen-l); }
 
 <!-- Toast-Container für Erfolgsmeldungen -->
 <div id="toastBox" class="toast-box"></div>
+
+<!-- Workflow-Progressbar (wird bei wf-* Seiten eingeblendet) -->
+<div id="wfProgress" class="wf-progress" style="display:none;">
+  <div class="wf-progress-bar"><div class="wf-progress-fill" id="wfProgressFill"></div></div>
+  <div class="wf-progress-row">
+    <span class="wf-progress-text" id="wfProgressText">Schritt 1 von 8</span>
+    <button class="wf-cancel" onclick="workflowAbort()" title="Eintrag abbrechen">✕ Abbrechen</button>
+  </div>
+</div>
 
 <div class="container">
 
@@ -1266,10 +1316,58 @@ function saveCfg() { localStorage.setItem("cfg", JSON.stringify(config)); }
 function speichern() { /* no-op: DB ist die Wahrheit */ }
 
 /* ---------- Navigation ---------- */
+/* ---------- Workflow-Fortschrittsanzeige ---------- */
+/* Reihenfolge der Hauptschritte mit Label. Unterauswahlen (wf-reh etc.)
+   werden unter "Wildart" zusammengefasst, weil sie nur Sub-Pages von wf-wild sind. */
+const WF_STEPS = [
+  { id: "wf-name",       label: "Name" },
+  { id: "wf-wild",       label: "Wildart" },
+  { id: "wf-gewicht",    label: "Gewicht" },
+  { id: "wf-ort",        label: "Ort" },
+  { id: "wf-zeit",       label: "Schusszeit" },
+  { id: "wf-datum",      label: "Datum" },
+  { id: "wf-verwendung", label: "Verwendung" },
+  { id: "wf-summary",    label: "Zusammenfassung" },
+];
+const WF_SUB = {
+  "wf-reh":    { parent: "wf-wild",    label: "Rehwild – Klasse" },
+  "wf-hirsch": { parent: "wf-wild",    label: "Rotwild – Klasse" },
+  "wf-gams":   { parent: "wf-wild",    label: "Gamswild – Klasse" },
+  "wf-andere": { parent: "wf-wild",    label: "Andere Wildart" },
+};
+
+function updateWorkflowProgress(id) {
+  const box = document.getElementById("wfProgress");
+  if (!box) return;
+  const isWf = id && (id.startsWith("wf-") || WF_SUB[id]);
+  if (!isWf) {
+    box.style.display = "none";
+    return;
+  }
+  const mainId = WF_SUB[id] ? WF_SUB[id].parent : id;
+  const idx = WF_STEPS.findIndex(s => s.id === mainId);
+  const total = WF_STEPS.length;
+  const step  = idx >= 0 ? idx + 1 : 1;
+  const label = WF_SUB[id] ? WF_SUB[id].label : (WF_STEPS[idx] && WF_STEPS[idx].label) || "";
+  box.style.display = "block";
+  document.getElementById("wfProgressFill").style.width = Math.round((step / total) * 100) + "%";
+  document.getElementById("wfProgressText").textContent =
+    "Schritt " + step + " von " + total + " · " + label;
+}
+
+function workflowAbort() {
+  if (!confirm("Eintrag wirklich abbrechen? Alles bisher eingetippte geht verloren.")) return;
+  e = {};
+  aktuellerPunkt = null;
+  zeigeSeite("revier");
+  toast("Eintrag abgebrochen", "warn");
+}
+
 function zeigeSeite(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   const el = document.getElementById(id);
   if (el) el.classList.add("active");
+  updateWorkflowProgress(id);
 }
 
 /* ---------- Year ---------- */
