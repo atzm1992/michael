@@ -2,11 +2,28 @@
 /**
  * Abschussplan-API
  *
+ * Datenmodell pro Klassenzeile:
+ *   {
+ *     plan:    int,       // Sollzahl
+ *     enabled: bool,      // ob die Zeile angezeigt/gezählt wird
+ *     matches: string     // komma-separierte Liste: welche d.wild-Werte
+ *                         // in diese Zeile als Ist-Wert einfließen.
+ *                         // Leer/null -> nur der eigene Klassenname zählt.
+ *   }
+ *
  * GET  /api/plan.php?jahr=2026          → Plan für ein Jahr
- *                                         Rückgabe-Format wie im Frontend erwartet:
- *                                         { "Rehwild": {"T-Bock": 5, ...}, ... }
- * POST /api/plan.php                    → Plan für ein Jahr speichern  (Admin)
- *                                         Body: { jahr: 2026, plan: { "Rehwild": {...}, ... } }
+ *                                         Format:
+ *                                         {
+ *                                           jahr: 2026,
+ *                                           plan: {
+ *                                             "Rehwild": {
+ *                                               "T-Bock": { plan: 5, enabled: true, matches: "" },
+ *                                               ...
+ *                                             }
+ *                                           }
+ *                                         }
+ * POST /api/plan.php                    → Plan für ein Jahr speichern (Admin)
+ *                                         Body: { jahr, plan: { Wildart: { Klasse: {plan,enabled,matches} } } }
  */
 
 require_once __DIR__ . '/db.php';
@@ -25,7 +42,9 @@ function emptyPlan(array $defaults): array {
     $out = [];
     foreach ($defaults as $art => $klassen) {
         $out[$art] = [];
-        foreach ($klassen as $k) $out[$art][$k] = 0;
+        foreach ($klassen as $k) {
+            $out[$art][$k] = ['plan' => 0, 'enabled' => true, 'matches' => ''];
+        }
     }
     return $out;
 }
@@ -36,13 +55,21 @@ if ($method === 'GET') {
     if ($jahr <= 0) jsonErr('jahr fehlt');
 
     $result = emptyPlan($DEFAULT_KLASSEN);
-    $stmt = $pdo->prepare('SELECT wildart, klasse, plan_anzahl FROM abschussplan WHERE jahr = :j');
+    $stmt = $pdo->prepare(
+        'SELECT wildart, klasse, plan_anzahl, enabled, matches
+         FROM abschussplan WHERE jahr = :j
+         ORDER BY sort_order, klasse'
+    );
     $stmt->execute([':j' => $jahr]);
     foreach ($stmt->fetchAll() as $row) {
         $art = $row['wildart'];
         $kls = $row['klasse'];
         if (!isset($result[$art])) $result[$art] = [];
-        $result[$art][$kls] = (int) $row['plan_anzahl'];
+        $result[$art][$kls] = [
+            'plan'    => (int) $row['plan_anzahl'],
+            'enabled' => (int) $row['enabled'] === 1,
+            'matches' => (string) ($row['matches'] ?? ''),
+        ];
     }
     jsonOk(['jahr' => $jahr, 'plan' => $result]);
 }
@@ -61,16 +88,26 @@ if ($method === 'POST') {
         // Alten Plan des Jahres löschen und frisch schreiben
         $pdo->prepare('DELETE FROM abschussplan WHERE jahr = :j')->execute([':j' => $jahr]);
         $ins = $pdo->prepare(
-            'INSERT INTO abschussplan (jahr, wildart, klasse, plan_anzahl) VALUES (:j, :w, :k, :n)'
+            'INSERT INTO abschussplan
+             (jahr, wildart, klasse, plan_anzahl, enabled, matches, sort_order)
+             VALUES (:j, :w, :k, :n, :e, :m, :s)'
         );
         foreach ($plan as $art => $klassen) {
             if (!is_array($klassen)) continue;
-            foreach ($klassen as $kls => $anzahl) {
+            $sort = 0;
+            foreach ($klassen as $kls => $cfg) {
+                // Rückwärtskompatibilität: Alt-Format war ein einzelner int
+                if (is_int($cfg) || is_string($cfg)) {
+                    $cfg = ['plan' => (int) $cfg, 'enabled' => true, 'matches' => ''];
+                }
                 $ins->execute([
                     ':j' => $jahr,
                     ':w' => (string) $art,
                     ':k' => (string) $kls,
-                    ':n' => (int) $anzahl,
+                    ':n' => (int) ($cfg['plan'] ?? 0),
+                    ':e' => !empty($cfg['enabled']) ? 1 : 0,
+                    ':m' => (string) ($cfg['matches'] ?? ''),
+                    ':s' => $sort++,
                 ]);
             }
         }
