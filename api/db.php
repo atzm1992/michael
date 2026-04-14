@@ -47,6 +47,17 @@ function db(): PDO {
     static $pdo = null;
     global $CONFIG;
     if ($pdo === null) {
+        // Sanity-Check: fehlt ein Wert völlig, melden wir das klar.
+        foreach (['db_host','db_name','db_user','db_pass'] as $k) {
+            if (empty($CONFIG[$k])) {
+                http_response_code(500);
+                echo json_encode([
+                    'ok' => false,
+                    'error' => "Config-Feld '$k' ist leer – GitHub-Secret prüfen.",
+                ]);
+                exit;
+            }
+        }
         $dsn = sprintf(
             'mysql:host=%s;dbname=%s;charset=utf8mb4',
             $CONFIG['db_host'],
@@ -60,7 +71,13 @@ function db(): PDO {
             ]);
         } catch (PDOException $ex) {
             http_response_code(500);
-            echo json_encode(['error' => 'DB-Verbindung fehlgeschlagen']);
+            echo json_encode([
+                'ok'    => false,
+                'error' => 'DB-Verbindung fehlgeschlagen: ' . $ex->getMessage()
+                         . ' | host=' . $CONFIG['db_host']
+                         . ' db='     . $CONFIG['db_name']
+                         . ' user='   . $CONFIG['db_user'],
+            ]);
             exit;
         }
     }
