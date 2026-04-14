@@ -1,0 +1,20 @@
+{
+  "name": "Abschussliste Jagdrevier Prad",
+  "short_name": "Jagdrevier Prad",
+  "description": "Abschussliste und Wildkammer-Verwaltung für das Jagdrevier Prad am Stilfserjoch.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2e7d32",
+  "theme_color": "#2e7d32",
+  "lang": "de",
+  "icons": [
+    {
+      "src": "logo.jpg",
+      "sizes": "any",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}

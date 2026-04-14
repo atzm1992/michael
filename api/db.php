@@ -118,11 +118,12 @@ function ensureSchema(): void {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // Migration: falls die Tabelle schon existierte ohne koord_lat/lng,
-    // die Spalten nachträglich hinzufügen (idempotent per try/catch).
+    // Migration: Spalten nachträglich hinzufügen (idempotent per try/catch).
     try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN koord_lat DECIMAL(10,7) NULL AFTER koord_y"); }
     catch (PDOException $e) { /* column existiert bereits */ }
     try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN koord_lng DECIMAL(10,7) NULL AFTER koord_lat"); }
+    catch (PDOException $e) { /* column existiert bereits */ }
+    try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN wetter VARCHAR(120) NULL AFTER koord_lng"); }
     catch (PDOException $e) { /* column existiert bereits */ }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS abschussplan (

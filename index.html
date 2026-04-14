@@ -5,6 +5,12 @@
 <title>Abschussliste Jagdrevier Prad</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2e7d32">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jagdrevier Prad">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="logo.jpg">
 
 <!-- Leaflet (Open-Source-Karten-Bibliothek, nutzt OpenStreetMap-Tiles) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -110,6 +116,37 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px rgba(46,125,50,0.2);
 }
 
+/* Wildkammer-Übersicht auf der Startseite */
+.wildkammer-box {
+  margin: 12px 0;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-left: 4px solid var(--gruen);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+.wildkammer-box h4 {
+  margin: 0 0 6px;
+  color: var(--gruen-d);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wildkammer-box .wk-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  color: #333;
+}
+.wildkammer-box .wk-count {
+  font-weight: bold;
+  color: var(--gruen-d);
+}
+.wildkammer-box .wk-empty {
+  color: var(--grau);
+  font-style: italic;
+}
+
 /* Admin-Button oben rechts (immer sichtbar) */
 .admin-fab {
   position: fixed;
@@ -131,6 +168,37 @@ input:focus, select:focus, textarea:focus {
 }
 .admin-fab:hover { transform: scale(1.05); background: #fff; }
 .admin-fab.admin-active { background: #2e7d32; color: #fff; }
+
+/* ==================== DRUCKANSICHT ==================== */
+#druckview { display: none; }
+#druckview table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-top: 12px; }
+#druckview th, #druckview td {
+  border: 1px solid #333; padding: 4px 6px; text-align: left;
+  vertical-align: top;
+}
+#druckview th { background: #e0e0e0; }
+#druckview .print-header { text-align: center; margin-bottom: 12px; }
+#druckview .print-header h1 { font-size: 18pt; margin: 0 0 4px; }
+#druckview .print-header h2 { font-size: 13pt; margin: 0; font-weight: normal; color: #555; }
+#druckview .print-footer {
+  display: flex; justify-content: space-between; margin-top: 40px;
+  font-size: 10pt;
+}
+#druckview .sig-block { text-align: center; min-width: 30%; }
+#druckview .sig-line { border-top: 1px solid #000; padding-top: 2px; margin-bottom: 2px; }
+
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body { background: #fff !important; padding: 0; }
+  body * { visibility: hidden !important; }
+  #druckview, #druckview * { visibility: visible !important; }
+  #druckview {
+    display: block !important;
+    position: absolute; left: 0; top: 0; width: 100%;
+    background: #fff !important; color: #000 !important; padding: 0;
+  }
+  .admin-fab, .popup-overlay, .popup { display: none !important; }
+}
 
 .year-tabs {
   display: flex;
@@ -364,6 +432,10 @@ tr:hover { background: var(--gruen-l); }
     <h2>Abschussliste<br>Jagdrevier Prad</h2>
     <div class="code">Zahlencode: 1024</div>
   </div>
+
+  <!-- Wildkammer-Übersicht: was aktuell eingelagert ist -->
+  <div id="wildkammerBox" class="wildkammer-box"></div>
+
   <div class="topbar">
     <button onclick="zeigeSeite('park')">🌲 Park</button>
     <button onclick="zeigeSeite('revier')">🎯 Revier</button>
@@ -396,6 +468,8 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="openPlanPopup()">📋 Plan</button>
     <button class="sec" onclick="zeigeSeite('start')">⬅ Zurück</button>
   </div>
+  <input id="sucheInput" type="search" placeholder="🔍 Suche: Name, Wildart, Ort…"
+         oninput="onSucheChange()" autocomplete="off" style="margin:6px 0;">
   <div class="table-wrapper"><table id="tabelle"></table></div>
   <div class="cards" id="cardsContainer"></div>
 </div>
@@ -473,9 +547,12 @@ tr:hover { background: var(--gruen-l); }
 
 <div id="wf-ort" class="page">
   <h3>📍 Örtlichkeit</h3>
-  <div class="btn-grid">
-    <button onclick="setOrt('Prad')">Prad (Karte)</button>
-    <button onclick="zeigeAndereOrt()">Andere</button>
+  <button onclick="useHereAsLocation()" style="width:100%;background:var(--blau);">
+    📡 Jetzt hier (GPS)
+  </button>
+  <div class="btn-grid" style="margin-top:8px;">
+    <button onclick="setOrt('Prad')">🗺️ Karte öffnen</button>
+    <button class="sec" onclick="zeigeAndereOrt()">Andere</button>
   </div>
   <div id="andereOrtBox" style="display:none;margin-top:8px;">
     <input id="inputOrt" placeholder="Ort eingeben..." autocomplete="off">
@@ -563,9 +640,13 @@ tr:hover { background: var(--gruen-l); }
   </div>
 
  <div class="admin-section">
-  <h4>Daten exportieren</h4>
+  <h4>Daten exportieren / drucken</h4>
   <select id="exportYear"></select>
-  <button class="sm" onclick="exportExcel()">📊 Export als Excel</button>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+    <button class="sm" onclick="exportExcel()">📊 CSV/Excel</button>
+    <button class="sm" onclick="openPrintView()">🖨 Drucken / PDF</button>
+  </div>
+  <p class="hint">CSV zum Importieren in Excel, Drucken für die amtliche Abschussmeldung.</p>
  </div>
 
  <div class="admin-section">
@@ -598,6 +679,34 @@ tr:hover { background: var(--gruen-l); }
 </div>
 
 </div><!-- /container -->
+
+<!-- DRUCKANSICHT (nur sichtbar im Print-Modus) -->
+<div id="druckview">
+  <div class="print-header">
+    <h1>Abschussliste Jagdrevier Prad</h1>
+    <h2 id="druckSubtitle"></h2>
+  </div>
+  <table id="druckTabelle">
+    <thead>
+      <tr>
+        <th>Nr.</th><th>Erleger</th><th>Wildart</th><th>Klasse</th>
+        <th>kg</th><th>Ort</th><th>Zeit</th><th>Datum</th>
+        <th>Entn.</th><th>Verw.</th><th>Abfall</th><th>Gem.</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div class="print-footer">
+    <div class="sig-block">
+      <div class="sig-line">_______________________</div>
+      <div>Ort, Datum</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line">_______________________</div>
+      <div>Unterschrift Revierleiter</div>
+    </div>
+  </div>
+</div>
 
 <!-- KARTE POPUP -->
 <div id="mapOverlay" class="popup-overlay" style="display:none;" onclick="closeMap()"></div>
@@ -632,6 +741,80 @@ tr:hover { background: var(--gruen-l); }
 /* ============================================================
    ABSCHUSSLISTE JAGDREVIER PRAD – V3
    ============================================================ */
+
+/* ---------- PWA: Service Worker registrieren ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err =>
+      console.warn('Service Worker konnte nicht registriert werden:', err)
+    );
+  });
+}
+
+/* ---------- Online/Offline-Indikator ---------- */
+let isOnline = navigator.onLine;
+window.addEventListener('online',  () => { isOnline = true;  flushOutbox(); updateOfflineBanner(); });
+window.addEventListener('offline', () => { isOnline = false; updateOfflineBanner(); });
+
+function updateOfflineBanner() {
+  let b = document.getElementById('offlineBanner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'offlineBanner';
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#f57c00;color:#fff;'
+                    + 'text-align:center;padding:6px;font-size:13px;z-index:1200;'
+                    + 'box-shadow:0 -2px 6px rgba(0,0,0,0.2);';
+    document.body.appendChild(b);
+  }
+  const queued = outboxSize();
+  if (!isOnline) {
+    b.textContent = '📴 Offline — neue Einträge werden gespeichert und später hochgeladen' +
+                    (queued > 0 ? ` (${queued} ausstehend)` : '');
+    b.style.display = 'block';
+  } else if (queued > 0) {
+    b.textContent = `📡 Online — ${queued} Eintrag${queued === 1 ? '' : 'e'} wird/werden synchronisiert…`;
+    b.style.background = '#1565c0';
+    b.style.display = 'block';
+  } else {
+    b.style.display = 'none';
+    b.style.background = '#f57c00';
+  }
+}
+
+/* ---------- Offline-Queue (localStorage, kein IndexedDB für Einfachheit) ---------- */
+function outboxRead() {
+  try { return JSON.parse(localStorage.getItem('outbox') || '[]'); }
+  catch (_) { return []; }
+}
+function outboxWrite(arr) { localStorage.setItem('outbox', JSON.stringify(arr)); }
+function outboxSize() { return outboxRead().length; }
+
+function queueEntry(body) {
+  const q = outboxRead();
+  q.push({ body, t: Date.now() });
+  outboxWrite(q);
+  updateOfflineBanner();
+}
+
+async function flushOutbox() {
+  if (!isOnline) return;
+  const q = outboxRead();
+  if (!q.length) return;
+  const remaining = [];
+  for (const item of q) {
+    try {
+      const row = await api.createEintrag(item.body);
+      // Nur dazuhängen, wenn nicht schon vorhanden (z. B. doppelt auf verschiedenen Geräten)
+      if (typeof applyRow === 'function') applyRow(row);
+    } catch (_) {
+      remaining.push(item);
+    }
+  }
+  outboxWrite(remaining);
+  if (typeof updateYearTabs === 'function') updateYearTabs();
+  if (typeof anzeigen === 'function') anzeigen();
+  updateOfflineBanner();
+}
 
 /* ---------- Kosmetische Client-Konfiguration (bleibt lokal) ---------- */
 let config = JSON.parse(localStorage.getItem("cfg") || '{}');
@@ -738,6 +921,7 @@ function dbToClient(row) {
     entnommen:  row.entnommen || "",
     abfall:     row.abfall,
     gemeldet:   !!row.gemeldet,
+    wetter:     row.wetter || "",
   };
 }
 function clientToDb(ev) {
@@ -755,6 +939,7 @@ function clientToDb(ev) {
     entnommen:  ev.entnommen || null,
     abfall:     ev.abfall,
     gemeldet:   ev.gemeldet ? 1 : 0,
+    wetter:     ev.wetter || null,
   };
 }
 
@@ -763,9 +948,19 @@ async function reloadDaten() {
     const rows = await api.listDaten();
     daten = rows.map(dbToClient);
   } catch (err) {
-    alert("Fehler beim Laden der Daten: " + err.message);
-    daten = [];
+    // Offline-Start: lies die zuletzt bekannten Daten aus dem lokalen Cache
+    try {
+      const cached = JSON.parse(localStorage.getItem("daten_cache") || "[]");
+      daten = Array.isArray(cached) ? cached : [];
+      if (!navigator.onLine) {
+        console.log("Offline-Start mit " + daten.length + " gecachten Einträgen.");
+      } else {
+        console.warn("Server nicht erreichbar – zeige Cache.", err);
+      }
+    } catch (_) { daten = []; }
   }
+  // Cache für Offline aktualisieren
+  try { localStorage.setItem("daten_cache", JSON.stringify(daten)); } catch (_) {}
 }
 
 async function ensurePlan(year) {
@@ -843,6 +1038,10 @@ async function init() {
   applyConfig();
   updateYearTabs();
   anzeigen();
+
+  // Offline-Banner anzeigen + versuchen, Outbox zu leeren
+  updateOfflineBanner();
+  flushOutbox();
 }
 
 function applyConfig() {
@@ -903,14 +1102,56 @@ function updateYearTabs() {
   });
 }
 
+let sucheText = "";
+function onSucheChange() {
+  const el = document.getElementById("sucheInput");
+  sucheText = (el ? el.value : "").toLowerCase().trim();
+  anzeigen();
+}
+function matchesSearch(d, q) {
+  if (!q) return true;
+  const hay = [d.name, d.wildart, d.wild, d.ort, d.verwendung]
+              .map(x => (x || "").toString().toLowerCase()).join(" ");
+  return hay.includes(q);
+}
 function getFiltered() {
-  return daten.filter(d => d.datum && new Date(d.datum).getFullYear() === selectedYear);
+  return daten.filter(d =>
+    d.datum &&
+    new Date(d.datum).getFullYear() === selectedYear &&
+    matchesSearch(d, sucheText)
+  );
 }
 /* Liefert die id eines Filter-Index (nicht mehr den Array-Index!) */
 function realId(fi) { const d = getFiltered()[fi]; return d ? d.id : null; }
 /* Alias aus Kompatibilitätsgründen, falls noch irgendwo realIdx aufgerufen wird */
 function realIdx(fi) { return realId(fi); }
 function findById(id) { return daten.findIndex(d => d.id === id); }
+
+/* ---------- Wildkammer-Status (auf der Startseite) ---------- */
+function updateWildkammer() {
+  const box = document.getElementById("wildkammerBox");
+  if (!box) return;
+  // In der Kühlung = Eintrag existiert, aber entnommen ist leer/null
+  const inStorage = daten.filter(d => d.datum && !d.entnommen);
+  const byArt = {};
+  inStorage.forEach(d => {
+    const a = d.wildart || "Sonstiges";
+    byArt[a] = (byArt[a] || 0) + 1;
+  });
+
+  let html = '<h4>❄️ Wildkühlkammer</h4>';
+  if (!inStorage.length) {
+    html += '<div class="wk-empty">– leer –</div>';
+  } else {
+    Object.keys(byArt).sort().forEach(k => {
+      html += `<div class="wk-row"><span>${esc(k)}</span><span class="wk-count">${byArt[k]}</span></div>`;
+    });
+    html += `<div class="wk-row" style="margin-top:6px;border-top:1px solid rgba(46,125,50,0.3);padding-top:4px;">
+      <span><b>Gesamt</b></span><span class="wk-count">${inStorage.length}</span>
+    </div>`;
+  }
+  box.innerHTML = html;
+}
 
 /* ---------- Stats ---------- */
 function updateStats() {
@@ -1133,6 +1374,34 @@ function setAndere() {
 }
 function nextOrt() { e.gewicht = document.getElementById("inputGewicht").value; zeigeSeite("wf-ort"); }
 function setOrt(o) { o==="Prad" ? openMap("input") : (e.ort=o, zeigeSeite("wf-zeit")); }
+
+/* Direkter GPS-Abschuss-Ort: ohne Karte, nimm den aktuellen Standort */
+function useHereAsLocation() {
+  if (!navigator.geolocation) {
+    alert("Standort wird vom Browser nicht unterstützt. Bitte Karte benutzen.");
+    return;
+  }
+  // Feedback, während auf GPS gewartet wird
+  const hint = document.createElement("div");
+  hint.textContent = "📡 Standort wird ermittelt…";
+  hint.style.cssText = "margin-top:8px;padding:10px;background:#e3f2fd;border-radius:8px;color:#1565c0;";
+  document.querySelector("#wf-ort").appendChild(hint);
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      hint.remove();
+      e.latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      e.ort = "Prad";
+      zeigeSeite("wf-zeit");
+    },
+    err => {
+      hint.remove();
+      alert("Standort nicht verfügbar: " + err.message +
+            "\nBitte stattdessen Karte öffnen oder Ort manuell eingeben.");
+    },
+    { enableHighAccuracy: true, timeout: 15000 }
+  );
+}
 function zeigeAndereOrt() {
   document.getElementById("andereOrtBox").style.display="block";
   document.getElementById("inputOrt").focus();
@@ -1186,18 +1455,38 @@ async function finishSave() {
   e.entnommen = null;
   e.abfall = null;
   e.gemeldet = false;
+  const body = clientToDb(e);
   try {
-    const row = await api.createEintrag(clientToDb(e));
+    // Wenn offline: direkt in Outbox, ohne API-Versuch
+    if (!navigator.onLine) {
+      queueEntry(body);
+      alert("📴 Offline gespeichert.\nEintrag wird hochgeladen, sobald wieder Internet da ist.");
+      if (e.datum) selectedYear = new Date(e.datum).getFullYear();
+      updateYearTabs();
+      anzeigen();
+      e = {}; aktuellerPunkt = null;
+      zeigeSeite("revier");
+      return;
+    }
+    const row = await api.createEintrag(body);
     applyRow(row);
     if (row.datum) selectedYear = new Date(row.datum).getFullYear();
     await ensurePlan(selectedYear);
     updateYearTabs();
     anzeigen();
+    // Wetter im Hintergrund nachladen (falls wir GPS haben)
+    fetchWetterForEntry(row.id).catch(() => {});
     e = {};
     aktuellerPunkt = null;
     zeigeSeite("revier");
   } catch (err) {
-    alert("Speichern fehlgeschlagen: " + err.message);
+    // Server nicht erreichbar obwohl online? Queue stattdessen.
+    queueEntry(body);
+    alert("⚠ Server antwortet nicht — Eintrag wurde offline gespeichert und wird nachgereicht.");
+    updateYearTabs();
+    anzeigen();
+    e = {}; aktuellerPunkt = null;
+    zeigeSeite("revier");
   }
 }
 
@@ -1374,7 +1663,7 @@ function mapUseMyLocation() {
    ANZEIGE
    ============================================================ */
 function anzeigen() {
-  updateStats(); applyConfig();
+  updateStats(); applyConfig(); updateWildkammer();
   const fd = getFiltered();
 
   // Desktop
@@ -1465,6 +1754,7 @@ function anzeigen() {
         <div><span class="label">Datum</span><br>${formatDatum(d.datum)}</div>
         <div><span class="label">Verwendung</span><br>${esc(d.verwendung||"–")}</div>
       </div>
+      ${d.wetter ? `<div style="font-size:11px;color:var(--grau);margin-top:4px;">🌡️ ${esc(d.wetter)}</div>` : ''}
       <div class="card-actions">${entH} ${abfH}</div>`;
     cc.appendChild(card);
   });
@@ -1704,6 +1994,102 @@ async function changePassword() {
   } catch (err) {
     alert("Passwort-Wechsel fehlgeschlagen: " + err.message);
   }
+}
+
+/* ---------- Wetter via Open-Meteo (kostenlos, kein API-Key) ---------- */
+async function fetchWetterForEntry(id) {
+  const d = daten.find(x => x.id === id);
+  if (!d || !d.latlng || !d.datum || !d.zeit) return;
+  // Stunde aus der Schusszeit extrahieren (HH:MM -> HH)
+  const hh = parseInt(d.zeit.slice(0, 2), 10);
+  if (isNaN(hh)) return;
+
+  const url = 'https://api.open-meteo.com/v1/forecast'
+    + '?latitude=' + encodeURIComponent(d.latlng.lat)
+    + '&longitude=' + encodeURIComponent(d.latlng.lng)
+    + '&hourly=temperature_2m,wind_speed_10m,precipitation,weather_code'
+    + '&start_date=' + d.datum + '&end_date=' + d.datum
+    + '&timezone=Europe%2FRome';
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const h = data.hourly || {};
+    if (!h.time || !h.time.length) return;
+
+    // Index finden, dessen Stunde zur Schusszeit passt
+    let idx = h.time.findIndex(t => t.endsWith('T' + String(hh).padStart(2,'0') + ':00'));
+    if (idx < 0) idx = 0;
+
+    const t  = Math.round((h.temperature_2m?.[idx] ?? 0) * 10) / 10;
+    const w  = Math.round((h.wind_speed_10m?.[idx] ?? 0));
+    const p  = h.precipitation?.[idx] ?? 0;
+    const wc = h.weather_code?.[idx];
+
+    const text = t + '°C · Wind ' + w + ' km/h'
+               + (p > 0 ? ' · Niederschlag ' + p + ' mm' : '')
+               + (wc != null ? ' · ' + wetterCodeText(wc) : '');
+
+    // Eintrag aktualisieren (kein Alarm wenn es scheitert)
+    try {
+      const row = await api.updateEintrag(id, { wetter: text });
+      applyRow(row);
+      anzeigen();
+    } catch (_) {}
+  } catch (_) {
+    // Wetter nicht essenziell - Fehler still schlucken
+  }
+}
+
+function wetterCodeText(c) {
+  // Open-Meteo WMO-Codes, grob übersetzt
+  if (c === 0) return 'klar';
+  if (c === 1 || c === 2) return 'leicht bewölkt';
+  if (c === 3) return 'bedeckt';
+  if (c >= 45 && c <= 48) return 'Nebel';
+  if (c >= 51 && c <= 57) return 'Nieselregen';
+  if (c >= 61 && c <= 65) return 'Regen';
+  if (c >= 66 && c <= 67) return 'gefrierender Regen';
+  if (c >= 71 && c <= 77) return 'Schnee';
+  if (c >= 80 && c <= 82) return 'Regenschauer';
+  if (c >= 85 && c <= 86) return 'Schneeschauer';
+  if (c >= 95) return 'Gewitter';
+  return '';
+}
+
+/* ---------- Druckansicht (für amtliche Abschussmeldung) ---------- */
+function openPrintView() {
+  if (!isAdmin) return alert("Nur der Admin kann drucken.");
+  const year = parseInt(document.getElementById("exportYear").value, 10) || selectedYear;
+  const rows = daten
+    .filter(d => d.datum && new Date(d.datum).getFullYear() === year)
+    .sort((a,b) => (a.datum||'').localeCompare(b.datum||''));
+
+  document.getElementById("druckSubtitle").textContent =
+    "Jagdjahr " + year + " · " + rows.length + " Einträge · Stand " + formatDatum(new Date().toISOString().slice(0,10));
+
+  const tbody = document.querySelector("#druckTabelle tbody");
+  tbody.innerHTML = rows.map((d, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${esc(d.name || "")}</td>
+      <td>${esc(d.wildart || "")}</td>
+      <td>${esc(d.wild || "")}</td>
+      <td>${d.gewicht || ""}</td>
+      <td>${esc(d.ort || "")}</td>
+      <td>${esc(d.zeit || "")}</td>
+      <td>${formatDatum(d.datum)}</td>
+      <td>${formatDatum(d.entnommen)}</td>
+      <td>${esc(d.verwendung || "")}</td>
+      <td>${d.abfall === "ja" ? "Ja" : d.abfall === "nein" ? "Nein" : ""}</td>
+      <td>${d.gemeldet ? "✓" : ""}</td>
+    </tr>
+  `).join("");
+
+  // window.print() triggert den Druck-Dialog. @media print in CSS
+  // blendet alles außer #druckview aus.
+  window.print();
 }
 
 /* ---------- Export (CSV für Jahresmeldung) ---------- */
