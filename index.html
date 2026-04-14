@@ -409,6 +409,13 @@ tr:hover { background: var(--gruen-l); }
 #mapContainer .wild-marker.rot  { background: #E53935; }
 #mapContainer .wild-marker.gams { background: #424242; }
 #mapContainer .wild-marker.fox  { background: #FF6D00; }
+/* Park-Rotwild: je Klasse eine eigene Farbe */
+#mapContainer .wild-marker.park-thirsch    { background: #8E0000; }  /* dunkelrot */
+#mapContainer .wild-marker.park-jhirsch    { background: #FF6D00; }  /* orange */
+#mapContainer .wild-marker.park-tier       { background: #E91E63; }  /* pink */
+#mapContainer .wild-marker.park-schmaltier { background: #AB47BC; }  /* violett */
+#mapContainer .wild-marker.park-kalb       { background: #FFEB3B; }  /* gelb */
+#mapContainer .wild-marker.fox  { background: #FF6D00; }
 #mapContainer .leaflet-div-icon {
   background: transparent;
   border: none;
@@ -594,16 +601,9 @@ tr:hover { background: var(--gruen-l); }
   <div id="wildkammerBox" class="wildkammer-box"></div>
 
   <div class="topbar">
-    <button onclick="zeigeSeite('park')">🌲 Park</button>
-    <button onclick="zeigeSeite('revier')">🎯 Revier</button>
+    <button id="btnPark" onclick="openRevierMode('park')">🌲 Park</button>
+    <button onclick="openRevierMode('revier')">🎯 Revier</button>
   </div>
-</div>
-
-<!-- PARK -->
-<div id="park" class="page">
-  <div class="header"><h2>🌲 Park</h2></div>
-  <p style="text-align:center;color:var(--grau);padding:30px 0;">Noch nicht aktiv</p>
-  <button class="sec full" onclick="zeigeSeite('start')">⬅ Zurück</button>
 </div>
 
 <!-- REVIER -->
@@ -676,7 +676,7 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="setWildDetail('Rotwild','Schmaltier')">Schmaltier</button>
     <button onclick="setWildDetail('Rotwild','Kalb')">Kalb</button>
   </div>
-  <button class="sec full" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
+  <button class="sec full" onclick="zeigeSeite(e.ist_park ? 'wf-name' : 'wf-wild')">⬅ Zurück</button>
   <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
@@ -828,6 +828,13 @@ tr:hover { background: var(--gruen-l); }
         </label>
       </div>
       <p class="hint">Eingeschaltet: Jeder Eintrag zeigt nur Name · Wildart · Datum, und wird beim Tippen aufgeklappt.</p>
+      <div class="admin-row" style="margin-top:10px;">
+        <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;">
+          <input id="cfgParkVisible" type="checkbox" style="width:auto;margin:0;">
+          🌲 Park-Bereich auch für normale Benutzer anzeigen
+        </label>
+      </div>
+      <p class="hint">Ausgeschaltet: Nur der Admin sieht den Park-Button auf der Startseite.</p>
     </div>
 
     <div class="admin-section">
@@ -844,6 +851,13 @@ tr:hover { background: var(--gruen-l); }
   <div id="tab-plan" class="admin-tab-content">
     <div class="admin-section">
       <h4>📋 Abschussplan bearbeiten</h4>
+      <div class="admin-row">
+        <label>Kontext:</label>
+        <select id="planKontext" onchange="renderPlan()">
+          <option value="revier">🎯 Revier</option>
+          <option value="park">🌲 Park</option>
+        </select>
+      </div>
       <div class="admin-row">
         <label>Jahr:</label>
         <select id="planYear" onchange="renderPlan()"></select>
@@ -871,6 +885,13 @@ tr:hover { background: var(--gruen-l); }
     <div class="admin-section">
       <h4>📊 Daten exportieren / drucken</h4>
       <div class="admin-row">
+        <label>Bereich:</label>
+        <select id="exportKontext">
+          <option value="revier">🎯 Revier</option>
+          <option value="park">🌲 Park</option>
+        </select>
+      </div>
+      <div class="admin-row">
         <label>Jahr:</label>
         <select id="exportYear"></select>
       </div>
@@ -878,7 +899,7 @@ tr:hover { background: var(--gruen-l); }
         <button class="sm" onclick="exportExcel()">📊 CSV/Excel</button>
         <button class="sm" onclick="openPrintView()">🖨 Drucken / PDF</button>
       </div>
-      <p class="hint">CSV zum Öffnen in Excel, Drucken für die amtliche Abschussmeldung.</p>
+      <p class="hint">CSV zum Öffnen in Excel, Drucken für die amtliche Abschussmeldung. Die Auswahl „Bereich" bestimmt, ob Revier- oder Park-Einträge exportiert werden.</p>
     </div>
 
     <div class="admin-section">
@@ -1061,6 +1082,7 @@ if (!config.code) config.code = "1024";
 if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
 if (typeof config.planVisible === "undefined") config.planVisible = true;
 if (typeof config.cardsCompact === "undefined") config.cardsCompact = true;
+if (typeof config.parkVisible === "undefined") config.parkVisible = true;
 
 /* ---------- Echte Daten: werden aus der API geladen ---------- */
 let daten = [];                 // alle Einträge (aus api/daten.php)
@@ -1072,6 +1094,7 @@ let viewIndex = null;
 let singleViewEntry = null;   // beim Single-View per Tabellenklick gesetzt
 let selectedYear = new Date().getFullYear();
 let statsFilter = "";         // Filter per Klick auf eine Stat-Kachel
+let appMode = "revier";       // "revier" oder "park" - steuert die Liste
 let isAdmin = false;
 let currentUser = null;
 
@@ -1110,11 +1133,14 @@ const api = {
       body: JSON.stringify({ action, id, value }),
     });
   },
-  getPlan(jahr) { return this.req('api/plan.php?jahr=' + jahr); },
-  savePlan(jahr, plan) {
+  getPlan(jahr, kontext) {
+    const k = kontext || 'revier';
+    return this.req('api/plan.php?jahr=' + jahr + '&kontext=' + encodeURIComponent(k));
+  },
+  savePlan(jahr, plan, kontext) {
     return this.req('api/plan.php', {
       method: 'POST',
-      body: JSON.stringify({ jahr, plan }),
+      body: JSON.stringify({ jahr, plan, kontext: kontext || 'revier' }),
     });
   },
   authStatus() { return this.req('api/auth.php'); },
@@ -1167,6 +1193,7 @@ function dbToClient(row) {
     entnommen:  row.entnommen || "",
     abfall:     row.abfall,
     gemeldet:   !!row.gemeldet,
+    ist_park:   !!row.ist_park,
     wetter:     row.wetter || "",
   };
 }
@@ -1185,6 +1212,7 @@ function clientToDb(ev) {
     entnommen:  ev.entnommen || null,
     abfall:     ev.abfall,
     gemeldet:   ev.gemeldet ? 1 : 0,
+    ist_park:   ev.ist_park ? 1 : 0,
     wetter:     ev.wetter || null,
   };
 }
@@ -1209,26 +1237,29 @@ async function reloadDaten() {
   try { localStorage.setItem("daten_cache", JSON.stringify(daten)); } catch (_) {}
 }
 
-async function ensurePlan(year) {
-  if (abschussplan[year]) return abschussplan[year];
+async function ensurePlan(year, kontextOverride) {
+  const kontext = kontextOverride || appMode || "revier";
+  const key = kontext + ":" + year;
+  if (abschussplan[key]) return abschussplan[key];
   try {
-    const res = await api.getPlan(year);
-    abschussplan[year] = normalizePlan(res.plan || {});
+    const res = await api.getPlan(year, kontext);
+    abschussplan[key] = normalizePlan(res.plan || {}, kontext);
   } catch (err) {
-    abschussplan[year] = normalizePlan({});
+    abschussplan[key] = normalizePlan({}, kontext);
   }
-  return abschussplan[year];
+  return abschussplan[key];
 }
 
 /* Einheitliches Plan-Format: { Wildart: { Klasse: { plan, enabled, matches } } }
    Nimmt sowohl altes Integer-Format als auch neues Objekt-Format entgegen
-   und füllt fehlende Default-Klassen auf. */
-function normalizePlan(raw) {
+   und füllt fehlende Default-Klassen auf.
+   Für "park" wird nur Rotwild als Default aufgebaut. */
+function normalizePlan(raw, kontext) {
   const out = {};
-  // Zuerst die Default-Struktur aufbauen
-  Object.keys(PLAN_KLASSEN).forEach(art => {
+  const defaults = (kontext === "park") ? PLAN_KLASSEN_PARK : PLAN_KLASSEN;
+  Object.keys(defaults).forEach(art => {
     out[art] = {};
-    PLAN_KLASSEN[art].forEach(k => {
+    defaults[art].forEach(k => {
       out[art][k] = { plan: 0, enabled: true, matches: "" };
     });
   });
@@ -1257,12 +1288,17 @@ const PLAN_KLASSEN = {
   "Rotwild":  ["T-Hirsch", "J-Hirsch", "Tier", "Schmaltier", "Kalb"],
   "Gamswild": ["Bock", "Geiß", "Jährling", "Kitz"]
 };
+const PLAN_KLASSEN_PARK = {
+  "Rotwild":  ["T-Hirsch", "J-Hirsch", "Tier", "Schmaltier", "Kalb"]
+};
 
 /* Lese-Zugriff auf den Plan im Cache. Rufer muss vorher ensurePlan(year)
    aufgerufen haben, sonst kommt ein leerer Default-Plan zurück. */
-function getPlan(year) {
-  if (abschussplan[year]) return abschussplan[year];
-  return normalizePlan({});
+function getPlan(year, kontextOverride) {
+  const kontext = kontextOverride || appMode || "revier";
+  const key = kontext + ":" + year;
+  if (abschussplan[key]) return abschussplan[key];
+  return normalizePlan({}, kontext);
 }
 
 /* ---------- Init ---------- */
@@ -1338,11 +1374,19 @@ function applyConfig() {
     const planVisible = (config.planVisible !== false) || isAdmin;
     btnPlan.style.display = planVisible ? "" : "none";
   }
-  // Checkbox im Admin-Panel
+  // Park-Button auf Startseite: gleiche Logik
+  const btnPark = document.getElementById("btnPark");
+  if (btnPark) {
+    const parkVisible = (config.parkVisible !== false) || isAdmin;
+    btnPark.style.display = parkVisible ? "" : "none";
+  }
+  // Checkboxen im Admin-Panel
   const cfgPlan = document.getElementById("cfgPlanVisible");
   if (cfgPlan) cfgPlan.checked = (config.planVisible !== false);
   const cfgCC = document.getElementById("cfgCardsCompact");
   if (cfgCC) cfgCC.checked = (config.cardsCompact !== false);
+  const cfgPV = document.getElementById("cfgParkVisible");
+  if (cfgPV) cfgPV.checked = (config.parkVisible !== false);
 
   const fab = document.getElementById("adminFab");
   if (fab) {
@@ -1410,11 +1454,35 @@ function matchesSearch(d, q) {
               .map(x => (x || "").toString().toLowerCase()).join(" ");
   return hay.includes(q);
 }
+/* Wechsel zwischen Revier- und Park-Ansicht. Beide zeigen dieselbe
+   Revier-Seite, aber mit unterschiedlichem appMode-Filter. */
+async function openRevierMode(mode) {
+  appMode = (mode === "park") ? "park" : "revier";
+  statsFilter = "";
+  const titleEl = document.getElementById("revierTitle");
+  if (titleEl) {
+    titleEl.textContent = appMode === "park"
+      ? "🌲 Park – " + (config.revier || "Jagdrevier Prad")
+      : (config.revier || "Jagdrevier Prad");
+  }
+  // Such-Input zurücksetzen
+  const sEl = document.getElementById("sucheInput");
+  if (sEl) sEl.value = "";
+  sucheText = "";
+  await ensurePlan(selectedYear);
+  updateYearTabs();
+  anzeigen();
+  zeigeSeite("revier");
+}
+
 function getFiltered() {
+  const isPark = (appMode === "park");
   const list = daten.filter(d =>
     d.datum &&
     new Date(d.datum).getFullYear() === selectedYear &&
-    (!statsFilter || (d.wildart || "Andere") === statsFilter) &&
+    (!!d.ist_park === isPark) &&
+    (!statsFilter || (d.wildart || "Andere") === statsFilter ||
+     (d.wild || "–") === statsFilter) &&
     matchesSearch(d, sucheText)
   );
   // Chronologisch: neueste zuerst, bei gleichem Datum nach Schusszeit,
@@ -1452,7 +1520,7 @@ function updateWildkammer() {
     byArt[a] = (byArt[a] || 0) + 1;
   });
 
-  let html = '<h4>❄️ Wildkühlkammer</h4>';
+  let html = '<h4>❄️ Kühlzelle</h4>';
   if (!inStorage.length) {
     html += '<div class="wk-empty">– leer –</div>';
   } else {
@@ -1468,13 +1536,20 @@ function updateWildkammer() {
 
 /* ---------- Stats ---------- */
 function updateStats() {
-  // Die Kacheln zählen IMMER alle Einträge des Jahres, unabhängig
-  // vom Such-/Stats-Filter, damit der Gesamtstand sichtbar bleibt.
+  // Die Kacheln zählen IMMER alle Einträge des Jahres im aktuellen
+  // appMode (Revier/Park), unabhängig vom Such-/Stats-Filter.
+  const isPark = (appMode === "park");
   const fdAll = daten.filter(d =>
-    d.datum && new Date(d.datum).getFullYear() === selectedYear
+    d.datum &&
+    new Date(d.datum).getFullYear() === selectedYear &&
+    (!!d.ist_park === isPark)
   );
+  // Im Park gruppieren wir nach Klasse (T-Hirsch ...), im Revier nach Wildart
   const counts = {};
-  fdAll.forEach(d => { const w = d.wildart || "Andere"; counts[w] = (counts[w]||0) + 1; });
+  fdAll.forEach(d => {
+    const k = isPark ? (d.wild || "–") : (d.wildart || "Andere");
+    counts[k] = (counts[k] || 0) + 1;
+  });
 
   const active = statsFilter;
   const totalClass = !active ? "stat-box active" : "stat-box";
@@ -1525,9 +1600,10 @@ function openHelp() {
       <li><b>Andere</b>: Ortsname frei eingeben, wenn es nicht in Prad war.</li>
     </ul>
 
-    <h4>❄️ Wildkühlkammer</h4>
+    <h4>❄️ Kühlzelle</h4>
     <p>Auf der Startseite siehst du, wie viele Tiere aktuell eingelagert und
-    noch nicht entnommen sind – gruppiert nach Wildart.</p>
+    noch nicht entnommen sind – gruppiert nach Wildart. Revier- und Park-
+    Einträge werden zusammen gezählt.</p>
 
     <h4>📊 Statistik-Kacheln als Filter</h4>
     <p>Im Revier-Tab kannst du auf „Rehwild 3", „Rotwild 2" usw. klicken –
@@ -1623,13 +1699,16 @@ async function openPlanPopup() {
   } catch (err) {
     console.error('[Plan] ensurePlan fehlgeschlagen:', err);
   }
-  // Popup zeigt das gewählte Jahr vollständig, nicht gefiltert durch
-  // Such-/Wildart-Filter, damit der Überblick stimmt.
+  // Popup zeigt das gewählte Jahr vollständig, im aktuellen appMode.
+  const isPark = (appMode === "park");
   const fullYear = daten.filter(d =>
-    d.datum && new Date(d.datum).getFullYear() === selectedYear
+    d.datum &&
+    new Date(d.datum).getFullYear() === selectedYear &&
+    (!!d.ist_park === isPark)
   );
   try {
-    document.getElementById("planPopupYear").textContent = "· Jagdjahr " + selectedYear;
+    document.getElementById("planPopupYear").textContent =
+      "· " + (isPark ? "🌲 Park" : "🎯 Revier") + " · Jagdjahr " + selectedYear;
     document.getElementById("planPopupBody").innerHTML =
       renderMonthChart(fullYear, selectedYear) +
       renderPlanIstTabelle(fullYear, selectedYear);
@@ -1804,10 +1883,12 @@ function fillPlanYears() {
 
 async function renderPlan() {
   const y = parseInt(document.getElementById("planYear").value, 10);
-  await ensurePlan(y);
-  const plan = getPlan(y);
+  const kontext = document.getElementById("planKontext").value || "revier";
+  await ensurePlan(y, kontext);
+  const plan = getPlan(y, kontext);
 
-  let html = '<p class="hint">✓ = wird im Plan gezählt.<br>'
+  const kontextLabel = kontext === "park" ? "🌲 Park" : "🎯 Revier";
+  let html = '<p class="hint">Bereich: <b>' + kontextLabel + '</b><br>✓ = wird im Plan gezählt.<br>'
            + '„Zählt als" ist optional und fasst mehrere Wild-Klassen zu einer Zeile zusammen.<br>'
            + 'Mehrere durch <b>Komma</b> trennen, z.B.: <code>T-Hirsch,J-Hirsch</code> ergibt eine Zeile „Männlich".<br>'
            + 'Leer lassen heißt: nur Einträge mit genau diesem Klassennamen werden gezählt.</p>';
@@ -1873,6 +1954,7 @@ function planAddGroup() {
 
 async function savePlan() {
   const y = parseInt(document.getElementById("planYear").value, 10);
+  const kontext = document.getElementById("planKontext").value || "revier";
   // Plan aus den Feldern rekonstruieren. Die Wildart steht pro Zeile in
   // data-art, der Klassenname ist das <input.pe-k>-Feld (damit man Klassen
   // umbenennen oder neu anlegen kann).
@@ -1890,8 +1972,8 @@ async function savePlan() {
     plan[art][kls] = cfg;
   });
   try {
-    await api.savePlan(y, plan);
-    abschussplan[y] = normalizePlan(plan);
+    await api.savePlan(y, plan, kontext);
+    abschussplan[kontext + ":" + y] = normalizePlan(plan, kontext);
     anzeigen();
     toast("✓ Abschussplan gespeichert");
   } catch (err) {
@@ -1967,9 +2049,16 @@ async function toggleGemeldet(id) {
 /* ---------- Workflow ---------- */
 function neuerEintrag() {
   e = {}; aktuellerPunkt = null;
+  // appMode merken, damit der Eintrag automatisch in Park bzw. Revier
+  // gespeichert wird
+  e.ist_park = (appMode === "park");
+  if (e.ist_park) {
+    // Im Park gibt es nur Rotwild – Wildart ist vordefiniert,
+    // die Klassen-Auswahl kommt direkt als nächster Schritt nach Name.
+    e.wildart = "Rotwild";
+  }
   document.getElementById("inputName").value = "";
   document.getElementById("andereInput").value = "";
-  // Gewicht zurück auf "bitte wählen" (Placeholder ist value="")
   const gsel = document.getElementById("inputGewicht");
   if (gsel) gsel.value = "";
   document.getElementById("inputOrt").value = "";
@@ -1997,7 +2086,13 @@ function buildNameSugg() {
 function nextWild() {
   const v = document.getElementById("inputName").value.trim();
   if (!v) return alert("Bitte Name eingeben!");
-  e.name = v; zeigeSeite("wf-wild");
+  e.name = v;
+  if (e.ist_park) {
+    // Park: Wildart ist fix Rotwild, direkt zur Klassen-Auswahl
+    zeigeSeite("wf-hirsch");
+  } else {
+    zeigeSeite("wf-wild");
+  }
 }
 function setWild(w) {
   e.wildart = w; e.wild = "";
@@ -2261,7 +2356,7 @@ function ensureLeaflet() {
     aktuellerPunkt = { lat: ev.latlng.lat, lng: ev.latlng.lng };
     if (leafletTempMarker) leafletTempMarker.remove();
     leafletTempMarker = L.marker(ev.latlng, {
-      icon: makeDivIcon(e.wildart)
+      icon: makeDivIcon(e.wildart, e.wild, !!e.ist_park)
     }).addTo(leafletMap);
   };
   leafletMap.on('click', leafletClickHandler);
@@ -2276,10 +2371,22 @@ function wildartClass(w) {
   return '';
 }
 
-function makeDivIcon(wildart) {
+/* Im Park-Modus färben wir nach Klasse (T-Hirsch, J-Hirsch, Tier, ...),
+   weil alle Einträge ohnehin Rotwild sind. */
+function parkKlasseClass(wild) {
+  if (wild === 'T-Hirsch')   return 'park-thirsch';
+  if (wild === 'J-Hirsch')   return 'park-jhirsch';
+  if (wild === 'Tier')       return 'park-tier';
+  if (wild === 'Schmaltier') return 'park-schmaltier';
+  if (wild === 'Kalb')       return 'park-kalb';
+  return 'rot';
+}
+
+function makeDivIcon(wildart, wild, isPark) {
+  const cls = isPark ? parkKlasseClass(wild) : wildartClass(wildart);
   return L.divIcon({
     className: '',
-    html: `<div class="wild-marker ${wildartClass(wildart)}"></div>`,
+    html: `<div class="wild-marker ${cls}"></div>`,
     iconSize: [22, 22],
     iconAnchor: [11, 11],
   });
@@ -2344,14 +2451,14 @@ function setupMapMarkers(mode) {
   if (mode === "input") {
     map.setView(PRAD_CENTER, PRAD_ZOOM);
     if (validLL(e.latlng)) {
-      leafletTempMarker = L.marker(e.latlng, { icon: makeDivIcon(e.wildart) }).addTo(map);
+      leafletTempMarker = L.marker(e.latlng, { icon: makeDivIcon(e.wildart, e.wild, !!e.ist_park) }).addTo(map);
     }
   } else if (mode === "view") {
     const points = [];
     const fd = getFiltered();
     fd.forEach(d => {
       if (validLL(d.latlng)) {
-        L.marker(d.latlng, { icon: makeDivIcon(d.wildart) })
+        L.marker(d.latlng, { icon: makeDivIcon(d.wildart, d.wild, !!d.ist_park) })
           .bindTooltip(`${d.name}: ${d.wildart} ${d.wild||''} (${formatDatum(d.datum)})`)
           .addTo(leafletEntryLayer);
         points.push([d.latlng.lat, d.latlng.lng]);
@@ -2374,7 +2481,7 @@ function setupMapMarkers(mode) {
     }
     console.log('[Karte] single setup: d=', d, 'validLL=', d && validLL(d.latlng));
     if (d && validLL(d.latlng)) {
-      L.marker(d.latlng, { icon: makeDivIcon(d.wildart) })
+      L.marker(d.latlng, { icon: makeDivIcon(d.wildart, d.wild, !!d.ist_park) })
         .bindTooltip(`${d.name}: ${d.wildart} ${d.wild||''}`)
         .addTo(leafletEntryLayer);
       // setView muss MANCHMAL zweimal aufgerufen werden, weil Leaflet
@@ -2437,7 +2544,7 @@ function mapUseMyLocation() {
       if (mapMode === "input") {
         aktuellerPunkt = { lat, lng };
         if (leafletTempMarker) leafletTempMarker.remove();
-        leafletTempMarker = L.marker([lat, lng], { icon: makeDivIcon(e.wildart) }).addTo(map);
+        leafletTempMarker = L.marker([lat, lng], { icon: makeDivIcon(e.wildart, e.wild, !!e.ist_park) }).addTo(map);
       }
     },
     err => {
@@ -2857,6 +2964,7 @@ function saveConfig() {
   config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
   config.planVisible = document.getElementById("cfgPlanVisible").checked;
   config.cardsCompact = document.getElementById("cfgCardsCompact").checked;
+  config.parkVisible = document.getElementById("cfgParkVisible").checked;
   saveCfg(); applyConfig();
   anzeigen();     // Tabelle neu rendern, damit die Card-Darstellung wechselt
   toast("✓ Einstellungen gespeichert");
@@ -2942,12 +3050,16 @@ function wetterCodeText(c) {
 function openPrintView() {
   if (!isAdmin) return alert("Nur der Admin kann drucken.");
   const year = parseInt(document.getElementById("exportYear").value, 10) || selectedYear;
+  const kontext = document.getElementById("exportKontext").value || "revier";
+  const isPark = kontext === "park";
   const rows = daten
-    .filter(d => d.datum && new Date(d.datum).getFullYear() === year)
+    .filter(d => d.datum && new Date(d.datum).getFullYear() === year && !!d.ist_park === isPark)
     .sort((a,b) => (a.datum||'').localeCompare(b.datum||''));
 
   document.getElementById("druckSubtitle").textContent =
-    "Jagdjahr " + year + " · " + rows.length + " Einträge · Stand " + formatDatum(new Date().toISOString().slice(0,10));
+    (isPark ? "🌲 Park · " : "🎯 Revier · ")
+    + "Jagdjahr " + year + " · " + rows.length + " Einträge · Stand "
+    + formatDatum(new Date().toISOString().slice(0,10));
 
   const tbody = document.querySelector("#druckTabelle tbody");
   tbody.innerHTML = rows.map((d, i) => `
@@ -3023,13 +3135,17 @@ function uploadBackup(ev) {
 
 function exportExcel() {
   const year = document.getElementById("exportYear").value;
+  const kontext = document.getElementById("exportKontext").value || "revier";
+  const isPark = kontext === "park";
 
   const data = daten.filter(d =>
-    d.datum && new Date(d.datum).getFullYear() == year
+    d.datum &&
+    new Date(d.datum).getFullYear() == year &&
+    (!!d.ist_park === isPark)
   );
 
   if (!data.length) {
-    alert("Keine Daten für dieses Jahr!");
+    alert("Keine Daten für " + (isPark ? "Park" : "Revier") + " im Jahr " + year + "!");
     return;
   }
 
@@ -3053,7 +3169,7 @@ function exportExcel() {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = "abschussliste_" + year + ".csv";
+  a.download = "abschussliste_" + (isPark ? "park_" : "revier_") + year + ".csv";
   a.click();
 
   URL.revokeObjectURL(url);
