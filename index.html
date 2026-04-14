@@ -163,6 +163,37 @@ input:focus, select:focus, textarea:focus {
 .admin-fab:hover { transform: scale(1.05); background: #fff; }
 .admin-fab.admin-active { background: #2e7d32; color: #fff; }
 
+/* ==================== DRUCKANSICHT ==================== */
+#druckview { display: none; }
+#druckview table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-top: 12px; }
+#druckview th, #druckview td {
+  border: 1px solid #333; padding: 4px 6px; text-align: left;
+  vertical-align: top;
+}
+#druckview th { background: #e0e0e0; }
+#druckview .print-header { text-align: center; margin-bottom: 12px; }
+#druckview .print-header h1 { font-size: 18pt; margin: 0 0 4px; }
+#druckview .print-header h2 { font-size: 13pt; margin: 0; font-weight: normal; color: #555; }
+#druckview .print-footer {
+  display: flex; justify-content: space-between; margin-top: 40px;
+  font-size: 10pt;
+}
+#druckview .sig-block { text-align: center; min-width: 30%; }
+#druckview .sig-line { border-top: 1px solid #000; padding-top: 2px; margin-bottom: 2px; }
+
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body { background: #fff !important; padding: 0; }
+  body * { visibility: hidden !important; }
+  #druckview, #druckview * { visibility: visible !important; }
+  #druckview {
+    display: block !important;
+    position: absolute; left: 0; top: 0; width: 100%;
+    background: #fff !important; color: #000 !important; padding: 0;
+  }
+  .admin-fab, .popup-overlay, .popup { display: none !important; }
+}
+
 .year-tabs {
   display: flex;
   gap: 6px;
@@ -603,9 +634,13 @@ tr:hover { background: var(--gruen-l); }
   </div>
 
  <div class="admin-section">
-  <h4>Daten exportieren</h4>
+  <h4>Daten exportieren / drucken</h4>
   <select id="exportYear"></select>
-  <button class="sm" onclick="exportExcel()">📊 Export als Excel</button>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+    <button class="sm" onclick="exportExcel()">📊 CSV/Excel</button>
+    <button class="sm" onclick="openPrintView()">🖨 Drucken / PDF</button>
+  </div>
+  <p class="hint">CSV zum Importieren in Excel, Drucken für die amtliche Abschussmeldung.</p>
  </div>
 
  <div class="admin-section">
@@ -638,6 +673,34 @@ tr:hover { background: var(--gruen-l); }
 </div>
 
 </div><!-- /container -->
+
+<!-- DRUCKANSICHT (nur sichtbar im Print-Modus) -->
+<div id="druckview">
+  <div class="print-header">
+    <h1>Abschussliste Jagdrevier Prad</h1>
+    <h2 id="druckSubtitle"></h2>
+  </div>
+  <table id="druckTabelle">
+    <thead>
+      <tr>
+        <th>Nr.</th><th>Erleger</th><th>Wildart</th><th>Klasse</th>
+        <th>kg</th><th>Ort</th><th>Zeit</th><th>Datum</th>
+        <th>Entn.</th><th>Verw.</th><th>Abfall</th><th>Gem.</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div class="print-footer">
+    <div class="sig-block">
+      <div class="sig-line">_______________________</div>
+      <div>Ort, Datum</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line">_______________________</div>
+      <div>Unterschrift Revierleiter</div>
+    </div>
+  </div>
+</div>
 
 <!-- KARTE POPUP -->
 <div id="mapOverlay" class="popup-overlay" style="display:none;" onclick="closeMap()"></div>
@@ -1814,6 +1877,40 @@ async function changePassword() {
   } catch (err) {
     alert("Passwort-Wechsel fehlgeschlagen: " + err.message);
   }
+}
+
+/* ---------- Druckansicht (für amtliche Abschussmeldung) ---------- */
+function openPrintView() {
+  if (!isAdmin) return alert("Nur der Admin kann drucken.");
+  const year = parseInt(document.getElementById("exportYear").value, 10) || selectedYear;
+  const rows = daten
+    .filter(d => d.datum && new Date(d.datum).getFullYear() === year)
+    .sort((a,b) => (a.datum||'').localeCompare(b.datum||''));
+
+  document.getElementById("druckSubtitle").textContent =
+    "Jagdjahr " + year + " · " + rows.length + " Einträge · Stand " + formatDatum(new Date().toISOString().slice(0,10));
+
+  const tbody = document.querySelector("#druckTabelle tbody");
+  tbody.innerHTML = rows.map((d, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${esc(d.name || "")}</td>
+      <td>${esc(d.wildart || "")}</td>
+      <td>${esc(d.wild || "")}</td>
+      <td>${d.gewicht || ""}</td>
+      <td>${esc(d.ort || "")}</td>
+      <td>${esc(d.zeit || "")}</td>
+      <td>${formatDatum(d.datum)}</td>
+      <td>${formatDatum(d.entnommen)}</td>
+      <td>${esc(d.verwendung || "")}</td>
+      <td>${d.abfall === "ja" ? "Ja" : d.abfall === "nein" ? "Nein" : ""}</td>
+      <td>${d.gemeldet ? "✓" : ""}</td>
+    </tr>
+  `).join("");
+
+  // window.print() triggert den Druck-Dialog. @media print in CSS
+  // blendet alles außer #druckview aus.
+  window.print();
 }
 
 /* ---------- Export (CSV für Jahresmeldung) ---------- */
