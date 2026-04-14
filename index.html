@@ -562,13 +562,6 @@ tr:hover { background: var(--gruen-l); }
     <button class="sm" onclick="changePassword()">Passwort ändern</button>
   </div>
 
-  <div class="admin-section">
-    <h4>Karten-URL</h4>
-    <div class="admin-row">
-      <input id="cfgMapUrl" placeholder="URL zur Revierkarte">
-    </div>
-  </div>
-
  <div class="admin-section">
   <h4>Daten exportieren</h4>
   <select id="exportYear"></select>
@@ -644,7 +637,6 @@ tr:hover { background: var(--gruen-l); }
 let config = JSON.parse(localStorage.getItem("cfg") || '{}');
 if (!config.revier) config.revier = "Jagdverein Prad";
 if (!config.code) config.code = "1024";
-if (!config.mapUrl) config.mapUrl = "https://raw.githubusercontent.com/MichaelUnterkircher/meine-website/main/Revier2.png";
 if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
 
 /* ---------- Echte Daten: werden aus der API geladen ---------- */
@@ -851,9 +843,8 @@ async function init() {
 function applyConfig() {
   document.getElementById("cfgRevier").value = config.revier;
   document.getElementById("cfgCode").value = config.code;
-  document.getElementById("cfgMapUrl").value = config.mapUrl;
   document.getElementById("cfgAbfallText").value = config.abfallText;
-  document.getElementById("mapImage").src = config.mapUrl;
+  // Hinweis: Karte ist jetzt Leaflet/OSM, keine konfigurierbare Bild-URL mehr.
 
   // Header texts
   document.querySelectorAll('.header h2')[0].innerHTML = 'Abschussliste<br>' + esc(config.revier);
@@ -1691,7 +1682,6 @@ async function adminLogoutFull() {
 function saveConfig() {
   config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdverein Prad";
   config.code = document.getElementById("cfgCode").value.trim() || "1024";
-  config.mapUrl = document.getElementById("cfgMapUrl").value.trim() || config.mapUrl;
   config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
   saveCfg(); applyConfig();
   alert("Einstellungen gespeichert!");
