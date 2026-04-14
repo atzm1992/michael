@@ -488,7 +488,7 @@ tr:hover { background: var(--gruen-l); }
   <div class="topbar">
     <button onclick="neuerEintrag()">➕ Neuer Eintrag</button>
     <button onclick="openMapAll()">🗺️ Karte</button>
-    <button onclick="openPlanPopup()">📋 Plan</button>
+    <button id="btnPlan" onclick="openPlanPopup()">📋 Plan</button>
     <button class="sec" onclick="zeigeSeite('start')">⬅ Zurück</button>
   </div>
   <input id="sucheInput" type="search" placeholder="🔍 Suche: Name, Wildart, Ort…"
@@ -653,6 +653,17 @@ tr:hover { background: var(--gruen-l); }
       <textarea id="cfgAbfallText" rows="2" style="font-size:14px;"></textarea>
     </div>
     <p class="hint">Wird im Abfall-Dialog angezeigt.</p>
+  </div>
+
+  <div class="admin-section">
+    <h4>Sichtbarkeit</h4>
+    <div class="admin-row">
+      <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;">
+        <input id="cfgPlanVisible" type="checkbox" style="width:auto;margin:0;">
+        📋 Plan-Button auch für normale Benutzer anzeigen
+      </label>
+    </div>
+    <p class="hint">Ausgeschaltet: Nur der Admin sieht den Plan-Button.</p>
   </div>
 
   <div class="admin-section">
@@ -851,6 +862,7 @@ if (config.revier === "Jagdverein Prad") {
 if (!config.revier) config.revier = "Jagdrevier Prad";
 if (!config.code) config.code = "1024";
 if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
+if (typeof config.planVisible === "undefined") config.planVisible = true;
 
 /* ---------- Echte Daten: werden aus der API geladen ---------- */
 let daten = [];                 // alle Einträge (aus api/daten.php)
@@ -1120,6 +1132,18 @@ function applyConfig() {
 
   // Admin indicator
   document.getElementById("adminIndicator").style.display = isAdmin ? "block" : "none";
+
+  // Plan-Button: für normale Benutzer nur sichtbar, wenn Admin ihn
+  // aktiviert hat. Admin sieht ihn immer.
+  const btnPlan = document.getElementById("btnPlan");
+  if (btnPlan) {
+    const planVisible = (config.planVisible !== false) || isAdmin;
+    btnPlan.style.display = planVisible ? "" : "none";
+  }
+  // Checkbox im Admin-Panel
+  const cfgPlan = document.getElementById("cfgPlanVisible");
+  if (cfgPlan) cfgPlan.checked = (config.planVisible !== false);
+
   const fab = document.getElementById("adminFab");
   if (fab) {
     fab.textContent = isAdmin ? "⚙️" : "🔐";
@@ -1374,10 +1398,20 @@ function openHelp() {
 }
 
 async function openPlanPopup() {
-  await ensurePlan(selectedYear);
+  try {
+    await ensurePlan(selectedYear);
+  } catch (err) {
+    console.error('[Plan] ensurePlan fehlgeschlagen:', err);
+  }
   const fd = getFiltered();
-  document.getElementById("planPopupYear").textContent = "· Jagdjahr " + selectedYear;
-  document.getElementById("planPopupBody").innerHTML = renderPlanIstTabelle(fd, selectedYear);
+  try {
+    document.getElementById("planPopupYear").textContent = "· Jagdjahr " + selectedYear;
+    document.getElementById("planPopupBody").innerHTML = renderPlanIstTabelle(fd, selectedYear);
+  } catch (err) {
+    console.error('[Plan] Popup-Rendering fehlgeschlagen:', err);
+    document.getElementById("planPopupBody").innerHTML =
+      '<p class="hint">Fehler beim Laden: ' + esc(err.message || String(err)) + '</p>';
+  }
   document.getElementById("planOverlay").style.display = "block";
   document.getElementById("planPopup").style.display = "block";
 }
@@ -1389,51 +1423,71 @@ function closePlanPopup() {
 
 /* Plan vs. Ist vs. Rest – wird vom Popup aufgerufen */
 function renderPlanIstTabelle(fd, year) {
-  const plan = getPlan(year);
+  try {
+    const plan = getPlan(year) || {};
 
-  // Pro Wildart Ist-Werte pro Wild-Klasse grob vorzählen
-  const raw = {};
-  fd.forEach(d => {
-    const a = d.wildart || "";
-    if (!raw[a]) raw[a] = {};
-    const k = d.wild || "–";
-    raw[a][k] = (raw[a][k] || 0) + 1;
-  });
-
-  // Für jede Plan-Zeile den Ist-Wert berechnen.
-  // matches ist optional eine kommagetrennte Liste; wenn gesetzt,
-  // werden alle dort aufgeführten Wild-Klassen zusammengezählt.
-  function istFor(art, klasse, matches) {
-    const bucket = raw[art] || {};
-    const keys = matches && matches.trim()
-      ? matches.split(",").map(s => s.trim()).filter(Boolean)
-      : [klasse];
-    let sum = 0;
-    keys.forEach(k => { sum += (bucket[k] || 0); });
-    return sum;
-  }
-
-  let html = '<div class="plan-ist-wrap"><h4>Abschussplan ' + year + '</h4>';
-  Object.keys(plan).forEach(art => {
-    const rows = Object.keys(plan[art]).filter(k => plan[art][k].enabled);
-    if (!rows.length) return;
-    html += `<table class="plan-ist">
-      <tr><th colspan="4">${esc(art)}</th></tr>
-      <tr><th>Klasse</th><th>Plan</th><th>Ist</th><th>Rest</th></tr>`;
-    let sP = 0, sI = 0;
-    rows.forEach(k => {
-      const row = plan[art][k];
-      const p   = row.plan || 0;
-      const iv  = istFor(art, k, row.matches);
-      const rest = p - iv;
-      sP += p; sI += iv;
-      const cls = (rest < 0) ? ' class="over"' : '';
-      html += `<tr${cls}><td>${esc(k)}</td><td>${p}</td><td>${iv}</td><td>${rest}</td></tr>`;
+    // Pro Wildart Ist-Werte pro Wild-Klasse grob vorzählen
+    const raw = {};
+    fd.forEach(d => {
+      const a = d.wildart || "";
+      if (!raw[a]) raw[a] = {};
+      const k = d.wild || "–";
+      raw[a][k] = (raw[a][k] || 0) + 1;
     });
-    html += `<tr class="sum"><td>Summe</td><td>${sP}</td><td>${sI}</td><td>${sP - sI}</td></tr></table>`;
-  });
-  html += '</div>';
-  return html;
+
+    function istFor(art, klasse, matches) {
+      const bucket = raw[art] || {};
+      const keys = matches && matches.trim()
+        ? matches.split(",").map(s => s.trim()).filter(Boolean)
+        : [klasse];
+      let sum = 0;
+      keys.forEach(k => { sum += (bucket[k] || 0); });
+      return sum;
+    }
+
+    // Helper: nimmt Wert in alter (int) oder neuer (object) Form
+    function rowValues(v) {
+      if (typeof v === "number") return { plan: v, enabled: true, matches: "" };
+      if (!v || typeof v !== "object") return { plan: 0, enabled: true, matches: "" };
+      return {
+        plan:    parseInt(v.plan, 10) || 0,
+        enabled: v.enabled !== false,
+        matches: (v.matches || "").toString(),
+      };
+    }
+
+    let html = '<div class="plan-ist-wrap"><h4>Abschussplan ' + year + '</h4>';
+    let anythingShown = false;
+    Object.keys(plan).forEach(art => {
+      const grp = plan[art] || {};
+      const enabledRows = Object.keys(grp).filter(k => rowValues(grp[k]).enabled);
+      if (!enabledRows.length) return;
+      anythingShown = true;
+      html += `<table class="plan-ist">
+        <tr><th colspan="4">${esc(art)}</th></tr>
+        <tr><th>Klasse</th><th>Plan</th><th>Ist</th><th>Rest</th></tr>`;
+      let sP = 0, sI = 0;
+      enabledRows.forEach(k => {
+        const rv = rowValues(grp[k]);
+        const p = rv.plan;
+        const iv = istFor(art, k, rv.matches);
+        const rest = p - iv;
+        sP += p; sI += iv;
+        const cls = (rest < 0) ? ' class="over"' : '';
+        html += `<tr${cls}><td>${esc(k)}</td><td>${p}</td><td>${iv}</td><td>${rest}</td></tr>`;
+      });
+      html += `<tr class="sum"><td>Summe</td><td>${sP}</td><td>${sI}</td><td>${sP - sI}</td></tr></table>`;
+    });
+    if (!anythingShown) {
+      html += '<p class="hint">Noch keine Klassen im Plan aktiv. Öffne das Admin-Panel → Abschussplan bearbeiten und hake mindestens eine Klasse an.</p>';
+    }
+    html += '</div>';
+    return html;
+  } catch (err) {
+    console.error('[Plan] renderPlanIstTabelle fehlgeschlagen:', err);
+    return '<div class="plan-ist-wrap"><h4>Fehler</h4><p class="hint">'
+         + esc(err.message || String(err)) + '</p></div>';
+  }
 }
 
 /* Plan-Editor im Admin-Panel */
@@ -2395,6 +2449,7 @@ function saveConfig() {
   config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdrevier Prad";
   config.code = document.getElementById("cfgCode").value.trim() || "1024";
   config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
+  config.planVisible = document.getElementById("cfgPlanVisible").checked;
   saveCfg(); applyConfig();
   alert("Einstellungen gespeichert!");
 }
