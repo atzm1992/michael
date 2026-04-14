@@ -303,8 +303,8 @@ tr:hover { background: var(--gruen-l); }
 <!-- STARTSEITE -->
 <div id="start" class="page active">
   <div class="header">
-    <img src="491438944_10226782024328158_4391837002889702168_n.jpg"
-         alt="Revierlogo" onerror="this.style.display='none'" id="logoImg">
+    <img src="logo.jpg"
+         alt="Jagdverein Prad" onerror="this.style.display='none'" id="logoImg">
     <h2>Abschussliste<br>Jagdrevier Prad</h2>
     <div class="code">Zahlencode: 1024</div>
   </div>
@@ -580,21 +580,150 @@ tr:hover { background: var(--gruen-l); }
    ABSCHUSSLISTE JAGDREVIER PRAD – V3
    ============================================================ */
 
+/* ---------- Kosmetische Client-Konfiguration (bleibt lokal) ---------- */
 let config = JSON.parse(localStorage.getItem("cfg") || '{}');
-if (!config.revier) config.revier = "Jagdrevier Prad";
+if (!config.revier) config.revier = "Jagdverein Prad";
 if (!config.code) config.code = "1024";
-if (!config.pass) config.pass = "1234";
 if (!config.mapUrl) config.mapUrl = "https://raw.githubusercontent.com/MichaelUnterkircher/meine-website/main/Revier2.png";
 if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
 
-let daten = JSON.parse(localStorage.getItem("daten") || "[]");
-let abschussplan = JSON.parse(localStorage.getItem("abschussplan") || "{}");
+/* ---------- Echte Daten: werden aus der API geladen ---------- */
+let daten = [];                 // alle Einträge (aus api/daten.php)
+let abschussplan = {};          // Plan-Cache pro Jahr (aus api/plan.php)
 let e = {};
 let aktuellerPunkt = null;
 let mapMode = "input";
 let viewIndex = null;
 let selectedYear = new Date().getFullYear();
 let isAdmin = false;
+let currentUser = null;
+
+/* ============================================================
+   API-Helper
+   ============================================================ */
+const api = {
+  async req(url, options = {}) {
+    const res = await fetch(url, {
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    let data = {};
+    try { data = await res.json(); } catch (_) { /* empty body */ }
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error || ('HTTP ' + res.status));
+    }
+    return data.data;
+  },
+  listDaten(jahr) {
+    return this.req('api/daten.php' + (jahr ? '?jahr=' + jahr : ''));
+  },
+  createEintrag(body) {
+    return this.req('api/daten.php', { method: 'POST', body: JSON.stringify(body) });
+  },
+  updateEintrag(id, body) {
+    return this.req('api/daten.php?id=' + id, { method: 'PUT', body: JSON.stringify(body) });
+  },
+  deleteEintrag(id) {
+    return this.req('api/daten.php?id=' + id, { method: 'DELETE' });
+  },
+  eintragAction(id, action, value) {
+    return this.req('api/daten.php', {
+      method: 'POST',
+      body: JSON.stringify({ action, id, value }),
+    });
+  },
+  getPlan(jahr) { return this.req('api/plan.php?jahr=' + jahr); },
+  savePlan(jahr, plan) {
+    return this.req('api/plan.php', {
+      method: 'POST',
+      body: JSON.stringify({ jahr, plan }),
+    });
+  },
+  authStatus() { return this.req('api/auth.php'); },
+  login(username, password) {
+    return this.req('api/auth.php', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'login', username, password }),
+    });
+  },
+  logout() {
+    return this.req('api/auth.php', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'logout' }),
+    });
+  },
+  changePassword(oldPw, newPw) {
+    return this.req('api/auth.php', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'change_pw', old: oldPw, new: newPw }),
+    });
+  },
+};
+
+/* Mapper zwischen DB-Zeile und Frontend-Objekt (koord_x/y ⇄ koord{x,y}) */
+function dbToClient(row) {
+  return {
+    id:         row.id,
+    name:       row.name || "",
+    wildart:    row.wildart || "",
+    wild:       row.wild || "",
+    gewicht:    row.gewicht,
+    ort:        row.ort || "",
+    koord:      (row.koord_x != null && row.koord_y != null)
+                ? { x: parseFloat(row.koord_x), y: parseFloat(row.koord_y) }
+                : null,
+    zeit:       row.zeit || "",
+    datum:      row.datum || "",
+    verwendung: row.verwendung || "",
+    entnommen:  row.entnommen || "",
+    abfall:     row.abfall,
+    gemeldet:   !!row.gemeldet,
+  };
+}
+function clientToDb(ev) {
+  return {
+    name:       ev.name,
+    wildart:    ev.wildart,
+    wild:       ev.wild,
+    gewicht:    ev.gewicht !== "" ? ev.gewicht : null,
+    ort:        ev.ort,
+    koord_x:    ev.koord ? ev.koord.x : null,
+    koord_y:    ev.koord ? ev.koord.y : null,
+    zeit:       ev.zeit,
+    datum:      ev.datum,
+    verwendung: ev.verwendung,
+    entnommen:  ev.entnommen || null,
+    abfall:     ev.abfall,
+    gemeldet:   ev.gemeldet ? 1 : 0,
+  };
+}
+
+async function reloadDaten() {
+  try {
+    const rows = await api.listDaten();
+    daten = rows.map(dbToClient);
+  } catch (err) {
+    alert("Fehler beim Laden der Daten: " + err.message);
+    daten = [];
+  }
+}
+
+async function ensurePlan(year) {
+  if (abschussplan[year]) return abschussplan[year];
+  try {
+    const res = await api.getPlan(year);
+    abschussplan[year] = res.plan || {};
+  } catch (err) {
+    // Bei Fehler: leeren Plan zurückgeben, damit die Anzeige nicht bricht
+    abschussplan[year] = {};
+    Object.keys(PLAN_KLASSEN).forEach(art => {
+      abschussplan[year][art] = {};
+      PLAN_KLASSEN[art].forEach(k => { abschussplan[year][art][k] = 0; });
+    });
+  }
+  return abschussplan[year];
+}
 
 /* Klassen-Struktur für den Abschussplan */
 const PLAN_KLASSEN = {
@@ -603,15 +732,16 @@ const PLAN_KLASSEN = {
   "Gamswild": ["Bock", "Geiß", "Jährling", "Kitz"]
 };
 
+/* Lese-Zugriff auf den Plan im Cache. Rufer muss vorher ensurePlan(year)
+   aufgerufen haben, sonst kommt ein leerer Default-Plan zurück. */
 function getPlan(year) {
-  if (!abschussplan[year]) {
-    abschussplan[year] = {};
-    Object.keys(PLAN_KLASSEN).forEach(art => {
-      abschussplan[year][art] = {};
-      PLAN_KLASSEN[art].forEach(k => { abschussplan[year][art][k] = 0; });
-    });
-  }
-  return abschussplan[year];
+  if (abschussplan[year]) return abschussplan[year];
+  const empty = {};
+  Object.keys(PLAN_KLASSEN).forEach(art => {
+    empty[art] = {};
+    PLAN_KLASSEN[art].forEach(k => { empty[art][k] = 0; });
+  });
+  return empty;
 }
 
 /* ---------- Init ---------- */
@@ -631,7 +761,7 @@ function fillExportYears() {
   sel.value = selectedYear;
 }
 
-function init() {
+async function init() {
   const sel = document.getElementById("inputGewicht");
   sel.innerHTML = "";
   for (let i = 0; i <= 200; i++) {
@@ -639,6 +769,18 @@ function init() {
     o.value = i; o.text = i + " kg";
     sel.appendChild(o);
   }
+
+  // Login-Status prüfen (bleibt auch nach Reload erhalten, weil PHP-Session)
+  try {
+    const a = await api.authStatus();
+    isAdmin = a && a.rolle === 'admin';
+    currentUser = (a && a.logged_in) ? a.username : null;
+  } catch (_) { isAdmin = false; currentUser = null; }
+
+  // Daten laden
+  await reloadDaten();
+  await ensurePlan(selectedYear);
+
   applyConfig();
   updateYearTabs();
   anzeigen();
@@ -662,10 +804,9 @@ function applyConfig() {
 }
 
 function saveCfg() { localStorage.setItem("cfg", JSON.stringify(config)); }
-function speichern() {
-  localStorage.setItem("daten", JSON.stringify(daten));
-  localStorage.setItem("abschussplan", JSON.stringify(abschussplan));
-}
+/* speichern() ist ein No-Op: alle Daten leben in der DB.
+   Die Funktion bleibt als Alias, weil viele Stellen sie aufrufen. */
+function speichern() { /* no-op: DB ist die Wahrheit */ }
 
 /* ---------- Navigation ---------- */
 function zeigeSeite(id) {
@@ -689,7 +830,12 @@ function updateYearTabs() {
     const s = document.createElement("span");
     s.className = "year-tab" + (y === selectedYear ? " active" : "");
     s.textContent = y;
-    s.onclick = () => { selectedYear = y; updateYearTabs(); anzeigen(); };
+    s.onclick = async () => {
+      selectedYear = y;
+      updateYearTabs();
+      await ensurePlan(y);
+      anzeigen();
+    };
     c.appendChild(s);
   });
 }
@@ -697,7 +843,11 @@ function updateYearTabs() {
 function getFiltered() {
   return daten.filter(d => d.datum && new Date(d.datum).getFullYear() === selectedYear);
 }
-function realIdx(fi) { return daten.indexOf(getFiltered()[fi]); }
+/* Liefert die id eines Filter-Index (nicht mehr den Array-Index!) */
+function realId(fi) { const d = getFiltered()[fi]; return d ? d.id : null; }
+/* Alias aus Kompatibilitätsgründen, falls noch irgendwo realIdx aufgerufen wird */
+function realIdx(fi) { return realId(fi); }
+function findById(id) { return daten.findIndex(d => d.id === id); }
 
 /* ---------- Stats ---------- */
 function updateStats() {
@@ -765,16 +915,18 @@ function fillPlanYears() {
   renderPlan();
 }
 
-function renderPlan() {
+async function renderPlan() {
   const y = parseInt(document.getElementById("planYear").value, 10);
+  await ensurePlan(y);
   const plan = getPlan(y);
   let html = '<table class="plan-ist">';
   Object.keys(PLAN_KLASSEN).forEach(art => {
     html += `<tr><th colspan="2">${art}</th></tr>`;
     PLAN_KLASSEN[art].forEach(k => {
+      const v = (plan[art] && plan[art][k]) || 0;
       html += `<tr>
         <td style="text-align:left;">${k}</td>
-        <td><input type="number" min="0" value="${plan[art][k] || 0}"
+        <td><input type="number" min="0" value="${v}"
              data-art="${art}" data-klasse="${k}" style="width:70px;padding:4px;"></td>
       </tr>`;
     });
@@ -783,15 +935,28 @@ function renderPlan() {
   document.getElementById("planEditor").innerHTML = html;
 }
 
-function savePlan() {
+async function savePlan() {
   const y = parseInt(document.getElementById("planYear").value, 10);
-  const plan = getPlan(y);
-  document.querySelectorAll("#planEditor input").forEach(inp => {
-    plan[inp.dataset.art][inp.dataset.klasse] = parseInt(inp.value, 10) || 0;
+  // frisches Plan-Objekt aus den Input-Feldern bauen
+  const plan = {};
+  Object.keys(PLAN_KLASSEN).forEach(art => {
+    plan[art] = {};
+    PLAN_KLASSEN[art].forEach(k => { plan[art][k] = 0; });
   });
-  speichern();
-  anzeigen();
-  alert("Abschussplan gespeichert.");
+  document.querySelectorAll("#planEditor input").forEach(inp => {
+    const art = inp.dataset.art;
+    const k   = inp.dataset.klasse;
+    if (!plan[art]) plan[art] = {};
+    plan[art][k] = parseInt(inp.value, 10) || 0;
+  });
+  try {
+    await api.savePlan(y, plan);
+    abschussplan[y] = plan;           // Cache aktualisieren
+    anzeigen();
+    alert("Abschussplan gespeichert.");
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
 }
 
 /* ---------- Meldeliste (gemeldet markieren) ---------- */
@@ -811,15 +976,13 @@ function fillMeldYears() {
 function renderMeldListe() {
   const y = parseInt(document.getElementById("meldYear").value, 10);
   const box = document.getElementById("meldListe");
-  const rows = daten
-    .map((d, i) => ({ d, i }))
-    .filter(x => x.d.datum && new Date(x.d.datum).getFullYear() === y);
+  const rows = daten.filter(d => d.datum && new Date(d.datum).getFullYear() === y);
   if (!rows.length) {
     box.innerHTML = '<p class="hint">Keine Einträge in diesem Jahr.</p>';
     return;
   }
   let html = '<table class="meld-table">';
-  rows.forEach(({ d, i }) => {
+  rows.forEach(d => {
     const label = `${formatDatum(d.datum)} · ${esc(d.name||"")} · ${esc(d.wildart||"")} ${esc(d.wild||"")}`.trim();
     const status = d.gemeldet
       ? '<span style="color:#c62828;">🔒 gemeldet</span>'
@@ -829,18 +992,24 @@ function renderMeldListe() {
     html += `<tr>
       <td>${label}</td>
       <td>${status}</td>
-      <td><button class="${btnCls}" onclick="toggleGemeldet(${i})">${btnLabel}</button></td>
+      <td><button class="${btnCls}" onclick="toggleGemeldet(${d.id})">${btnLabel}</button></td>
     </tr>`;
   });
   html += '</table>';
   box.innerHTML = html;
 }
 
-function toggleGemeldet(i) {
-  daten[i].gemeldet = !daten[i].gemeldet;
-  speichern();
-  renderMeldListe();
-  anzeigen();
+async function toggleGemeldet(id) {
+  const d = daten.find(x => x.id === id);
+  if (!d) return;
+  try {
+    const row = await api.eintragAction(id, 'gemeldet', !d.gemeldet);
+    applyRow(row);
+    renderMeldListe();
+    anzeigen();
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
 }
 
 /* ---------- Workflow ---------- */
@@ -936,37 +1105,61 @@ function editFromSummary() {
   zeigeSeite("wf-name");
 }
 
-function finishSave() {
-  e.entnommen = ""; e.abfall = null; e.gemeldet = false;
-  daten.push(e);
-  speichern();
-  if (e.datum) selectedYear = new Date(e.datum).getFullYear();
-  updateYearTabs(); anzeigen();
-  e = {}; aktuellerPunkt = null;
-  zeigeSeite("revier");
+async function finishSave() {
+  e.entnommen = null;
+  e.abfall = null;
+  e.gemeldet = false;
+  try {
+    const row = await api.createEintrag(clientToDb(e));
+    applyRow(row);
+    if (row.datum) selectedYear = new Date(row.datum).getFullYear();
+    await ensurePlan(selectedYear);
+    updateYearTabs();
+    anzeigen();
+    e = {};
+    aktuellerPunkt = null;
+    zeigeSeite("revier");
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
 }
 
 /* ---------- Gemeldet-Sperre ---------- */
-function istGesperrt(i) {
-  return daten[i] && daten[i].gemeldet === true && !isAdmin;
+function istGesperrt(id) {
+  const d = daten.find(x => x.id === id);
+  return d && d.gemeldet === true && !isAdmin;
 }
 function alertGesperrt() {
   alert("Dieser Eintrag ist als gemeldet gesperrt.\nNur der Admin kann ihn ändern.");
 }
 
+/* Gemeinsamer Helper: Eintrag nach API-Antwort im lokalen Array ersetzen */
+function applyRow(row) {
+  const mapped = dbToClient(row);
+  const idx = findById(mapped.id);
+  if (idx >= 0) daten[idx] = mapped;
+  else daten.push(mapped);
+  return mapped;
+}
+
 /* ---------- Karte ---------- */
-function openMap(mode, index) {
-  mapMode = mode; viewIndex = index ?? null;
+function openMap(mode, idOrNull) {
+  mapMode = mode; viewIndex = idOrNull ?? null;
   document.getElementById("mapOverlay").style.display = "block";
   document.getElementById("mapPopup").style.display = "block";
   document.getElementById("mapHint").style.display = mode==="input" ? "block" : "none";
   clearMarkers();
-  if (mode==="input" && e.koord) drawMarker(e.koord.x, e.koord.y, e.wildart);
-  else if (mode==="view") getFiltered().forEach(d => { if (d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart); });
-  else if (mode==="single") { const d=daten[viewIndex]; if (d&&d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart); }
+  if (mode==="input" && e.koord) {
+    drawMarker(e.koord.x, e.koord.y, e.wildart);
+  } else if (mode==="view") {
+    getFiltered().forEach(d => { if (d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart); });
+  } else if (mode==="single") {
+    const d = daten.find(x => x.id === viewIndex);
+    if (d && d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart);
+  }
 }
 function openMapAll() { openMap("view"); }
-function openMapFromTable(ri) { openMap("single", ri); }
+function openMapFromTable(id) { openMap("single", id); }
 function clearMarkers() { document.querySelectorAll("#mapContainer .marker").forEach(m=>m.remove()); }
 function closeMap() {
   document.getElementById("mapOverlay").style.display = "none";
@@ -1112,23 +1305,39 @@ function pickDate(i) {
   if (el.showPicker) el.showPicker();
   else { el.style.display="block"; el.focus(); }
 }
-function setEntnommen(i,val) {
-  if (istGesperrt(i)) return alertGesperrt();
-  if (val) { daten[i].entnommen=val; speichern(); anzeigen(); }
+async function setEntnommen(id, val) {
+  if (istGesperrt(id)) return alertGesperrt();
+  if (!val) return;
+  try {
+    const row = await api.eintragAction(id, 'entnommen', val);
+    applyRow(row);
+    anzeigen();
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
 }
 
-function handleAbfall(i) {
-  if (istGesperrt(i)) return alertGesperrt();
+function handleAbfall(id) {
+  if (istGesperrt(id)) return alertGesperrt();
   const ov = document.createElement("div"); ov.className="popup-overlay";
   ov.onclick = () => { ov.remove(); box.remove(); };
   const box = document.createElement("div"); box.className="popup";
   box.innerHTML = `<h3>Abfall</h3>
     <p style="margin:10px 0;">${esc(config.abfallText)}</p>
-    <button onclick="setAbfall(${i},'ja')">✅ Ja</button>
-    <button class="danger" onclick="setAbfall(${i},'nein')">❌ Nein</button>`;
+    <button onclick="setAbfall(${id},'ja')">✅ Ja</button>
+    <button class="danger" onclick="setAbfall(${id},'nein')">❌ Nein</button>`;
   document.body.appendChild(ov); document.body.appendChild(box);
 }
-function setAbfall(i,val) { daten[i].abfall=val; speichern(); anzeigen(); closePopups(); }
+async function setAbfall(id, val) {
+  try {
+    const row = await api.eintragAction(id, 'abfall', val);
+    applyRow(row);
+    anzeigen();
+    closePopups();
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
+}
 
 function closePopups() {
   document.querySelectorAll(".popup, .popup-overlay").forEach(el => {
@@ -1137,23 +1346,33 @@ function closePopups() {
 }
 
 /* ---------- Löschen: NUR Admin ---------- */
-function loeschen(i) {
+async function loeschen(id) {
   if (!isAdmin) return alert("Nur der Admin kann Einträge löschen.");
-  if (daten[i] && daten[i].gemeldet) {
+  const d = daten.find(x => x.id === id);
+  if (d && d.gemeldet) {
     if (!confirm("Dieser Eintrag ist als gemeldet markiert. Trotzdem löschen?")) return;
   } else {
     if (!confirm("Eintrag wirklich löschen?")) return;
   }
-  daten.splice(i,1); speichern(); updateYearTabs(); anzeigen();
+  try {
+    await api.deleteEintrag(id);
+    const idx = findById(id);
+    if (idx >= 0) daten.splice(idx, 1);
+    updateYearTabs();
+    anzeigen();
+  } catch (err) {
+    alert("Löschen fehlgeschlagen: " + err.message);
+  }
 }
 
 /* ============================================================
    ADMIN: EINTRAG BEARBEITEN
    ============================================================ */
-function openEdit(i) {
+function openEdit(id) {
   if (!isAdmin) return;
-  const d = daten[i];
-  const abfV = (d.abfall==null) ? "" : d.abfall;
+  const d = daten.find(x => x.id === id);
+  if (!d) return;
+  const abfV = (d.abfall == null) ? "" : d.abfall;
 
   const ov = document.createElement("div"); ov.className="popup-overlay";
   ov.onclick = () => { ov.remove(); box.remove(); };
@@ -1196,27 +1415,37 @@ function openEdit(i) {
       </label>
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;">
-      <button onclick="saveEdit(${i})" style="flex:1;">💾 Speichern</button>
+      <button onclick="saveEdit(${id})" style="flex:1;">💾 Speichern</button>
       <button class="sec" onclick="closePopups()" style="flex:1;">Abbrechen</button>
     </div>`;
   document.body.appendChild(ov); document.body.appendChild(box);
 }
 
-function saveEdit(i) {
-  const d = daten[i];
-  d.name = document.getElementById("ed_name").value.trim();
-  d.wildart = document.getElementById("ed_wildart").value.trim();
-  d.wild = document.getElementById("ed_wild").value.trim();
-  d.gewicht = document.getElementById("ed_gew").value;
-  d.ort = document.getElementById("ed_ort").value.trim();
-  d.zeit = document.getElementById("ed_zeit").value;
-  d.datum = document.getElementById("ed_datum").value;
-  d.entnommen = document.getElementById("ed_ent").value;
-  d.verwendung = document.getElementById("ed_verw").value;
+async function saveEdit(id) {
   const a = document.getElementById("ed_abf").value;
-  d.abfall = a==="" ? null : a;
-  d.gemeldet = document.getElementById("ed_gem").checked;
-  speichern(); closePopups(); updateYearTabs(); anzeigen();
+  const gew = document.getElementById("ed_gew").value;
+  const body = {
+    name:       document.getElementById("ed_name").value.trim(),
+    wildart:    document.getElementById("ed_wildart").value.trim(),
+    wild:       document.getElementById("ed_wild").value.trim(),
+    gewicht:    gew === "" ? null : parseInt(gew, 10),
+    ort:        document.getElementById("ed_ort").value.trim(),
+    zeit:       document.getElementById("ed_zeit").value,
+    datum:      document.getElementById("ed_datum").value,
+    entnommen:  document.getElementById("ed_ent").value || null,
+    verwendung: document.getElementById("ed_verw").value,
+    abfall:     a === "" ? null : a,
+    gemeldet:   document.getElementById("ed_gem").checked ? 1 : 0,
+  };
+  try {
+    const row = await api.updateEintrag(id, body);
+    applyRow(row);
+    closePopups();
+    updateYearTabs();
+    anzeigen();
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
 }
 
 /* ============================================================
@@ -1234,27 +1463,40 @@ function showLogin() {
   }
 }
 
-function doLogin() {
+async function doLogin() {
   const u = document.getElementById("adminUser").value.trim();
   const p = document.getElementById("adminPass").value;
-  if (u==="admin" && p===config.pass) {
-    isAdmin=true;
+  document.getElementById("adminPass").value = "";
+  try {
+    const r = await api.login(u, p);
+    isAdmin = (r.rolle === 'admin');
+    currentUser = r.username;
     applyConfig();
     zeigeSeite("admin");
     fillExportYears();
     fillPlanYears();
     fillMeldYears();
+    await reloadDaten();
+    anzeigen();
+  } catch (err) {
+    alert("Login fehlgeschlagen: " + err.message);
   }
-  else alert("Falsche Zugangsdaten!");
-  document.getElementById("adminPass").value = "";
 }
 
-function adminLogout() { isAdmin=false; applyConfig(); anzeigen(); }
+async function adminLogout() {
+  try { await api.logout(); } catch (_) {}
+  isAdmin = false; currentUser = null;
+  applyConfig(); anzeigen();
+}
 function adminToRevier() { applyConfig(); anzeigen(); zeigeSeite("revier"); }
-function adminLogoutFull() { isAdmin=false; applyConfig(); anzeigen(); zeigeSeite("start"); }
+async function adminLogoutFull() {
+  try { await api.logout(); } catch (_) {}
+  isAdmin = false; currentUser = null;
+  applyConfig(); anzeigen(); zeigeSeite("start");
+}
 
 function saveConfig() {
-  config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdrevier Prad";
+  config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdverein Prad";
   config.code = document.getElementById("cfgCode").value.trim() || "1024";
   config.mapUrl = document.getElementById("cfgMapUrl").value.trim() || config.mapUrl;
   config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
@@ -1262,26 +1504,46 @@ function saveConfig() {
   alert("Einstellungen gespeichert!");
 }
 
-function changePassword() {
+async function changePassword() {
   const np = document.getElementById("cfgNewPass").value;
-  if (!np || np.length<4) return alert("Passwort muss mind. 4 Zeichen haben!");
-  config.pass = np; saveCfg();
-  document.getElementById("cfgNewPass").value = "";
-  alert("Passwort geändert!");
+  if (!np || np.length < 4) return alert("Passwort muss mind. 4 Zeichen haben!");
+  const op = prompt("Aktuelles Passwort zur Bestätigung:");
+  if (!op) return;
+  try {
+    await api.changePassword(op, np);
+    document.getElementById("cfgNewPass").value = "";
+    alert("Passwort geändert.");
+  } catch (err) {
+    alert("Passwort-Wechsel fehlgeschlagen: " + err.message);
+  }
 }
 
-function clearYearData() {
-  if (!confirm("Alle Einträge von "+selectedYear+" wirklich löschen?")) return;
-  daten = daten.filter(d => !d.datum || new Date(d.datum).getFullYear()!==selectedYear);
-  speichern(); updateYearTabs(); anzeigen();
-  alert("Daten für "+selectedYear+" gelöscht.");
+async function clearYearData() {
+  if (!isAdmin) return alert("Nur der Admin.");
+  if (!confirm("Alle Einträge von " + selectedYear + " wirklich löschen?")) return;
+  const toDelete = daten.filter(d => d.datum && new Date(d.datum).getFullYear() === selectedYear);
+  let failed = 0;
+  for (const d of toDelete) {
+    try { await api.deleteEintrag(d.id); }
+    catch (_) { failed++; }
+  }
+  await reloadDaten();
+  updateYearTabs(); anzeigen();
+  alert("Daten für " + selectedYear + " gelöscht." + (failed ? " (" + failed + " Fehler)" : ""));
 }
 
-function clearAllData() {
+async function clearAllData() {
+  if (!isAdmin) return alert("Nur der Admin.");
   if (!confirm("ALLE Daten unwiderruflich löschen?")) return;
   if (!confirm("Wirklich ALLE? Nicht rückgängig!")) return;
-  daten=[]; speichern(); updateYearTabs(); anzeigen();
-  alert("Alle Daten gelöscht.");
+  let failed = 0;
+  for (const d of [...daten]) {
+    try { await api.deleteEintrag(d.id); }
+    catch (_) { failed++; }
+  }
+  await reloadDaten();
+  updateYearTabs(); anzeigen();
+  alert("Alle Daten gelöscht." + (failed ? " (" + failed + " Fehler)" : ""));
 }
 
 /* ---------- Export / Import ---------- */
@@ -1326,16 +1588,27 @@ function exportExcel() {
 function importJSON(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
-  r.onload = () => {
+  r.onload = async () => {
     try {
-      const p = JSON.parse(r.result);
-      if (!Array.isArray(p)) throw new Error("Kein Array");
-      if (!confirm("Import ersetzt aktuelle Liste. Fortfahren?")) return;
-      daten=p; speichern(); updateYearTabs(); anzeigen();
-      alert("Import: "+daten.length+" Einträge.");
-    } catch(e) { alert("Fehler: "+e.message); }
+      const list = JSON.parse(r.result);
+      if (!Array.isArray(list)) throw new Error("Kein Array");
+      if (!isAdmin) { alert("Nur der Admin kann importieren."); return; }
+      if (!confirm("Import legt " + list.length + " Einträge an. Fortfahren?")) return;
+      let ok = 0, fail = 0;
+      for (const d of list) {
+        try {
+          // Einträge im alten Format (mit d.koord statt koord_x/y) werden gemappt
+          const body = clientToDb({ ...d, gemeldet: false });
+          await api.createEintrag(body);
+          ok++;
+        } catch (_) { fail++; }
+      }
+      await reloadDaten();
+      updateYearTabs(); anzeigen();
+      alert("Import: " + ok + " ok, " + fail + " Fehler.");
+    } catch(e) { alert("Fehler: " + e.message); }
   };
-  r.readAsText(f); ev.target.value="";
+  r.readAsText(f); ev.target.value = "";
 }
 
 /* ---------- Auto-Advance ---------- */
@@ -1343,8 +1616,11 @@ document.getElementById("inputZeit").addEventListener("change", () => setTimeout
 document.getElementById("inputDatum").addEventListener("change", () => setTimeout(nextVerwendung, 300));
 
 /* ---------- Start ---------- */
-init();
-fillExportYears();
+init().catch(err => {
+  console.error(err);
+  alert("Start fehlgeschlagen: " + err.message +
+        "\nPrüfe, ob api/config.php existiert und die DB erreichbar ist.");
+});
 </script>
 </body>
 </html>
