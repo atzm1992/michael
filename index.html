@@ -859,6 +859,24 @@ tr:hover { background: var(--gruen-l); }
       </div>
       <p class="hint">CSV zum Öffnen in Excel, Drucken für die amtliche Abschussmeldung.</p>
     </div>
+
+    <div class="admin-section">
+      <h4>💾 Backup der Datenbank</h4>
+      <p class="hint">
+        Lädt einen vollständigen JSON-Dump aller Einträge und des Abschussplans
+        herunter. Passwörter werden aus Sicherheitsgründen NICHT exportiert.
+      </p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="sm" onclick="downloadBackup()">⬇ Backup herunterladen</button>
+        <button class="sm sec" onclick="document.getElementById('restoreFile').click()">⬆ Backup einspielen</button>
+        <input type="file" id="restoreFile" accept="application/json"
+               style="display:none" onchange="uploadBackup(event)">
+      </div>
+      <p class="hint" style="color:var(--rot);margin-top:6px;">
+        ⚠ Beim Einspielen werden ALLE aktuellen Einträge und der Plan
+        <b>überschrieben</b>. Vorher also immer ein aktuelles Backup machen.
+      </p>
+    </div>
   </div>
 
   <!-- Abstand, damit der letzte Inhalt nicht unter der Sticky-Bar verschwindet -->
@@ -2821,6 +2839,54 @@ function openPrintView() {
 }
 
 /* ---------- Export (CSV für Jahresmeldung) ---------- */
+/* ---------- Backup ---------- */
+function downloadBackup() {
+  if (!isAdmin) return toast("Nur Admin", "err");
+  // Einfach: neuer Tab auf die URL - der Server liefert mit
+  // Content-Disposition: attachment einen Datei-Download aus.
+  window.location.href = "api/backup.php";
+}
+
+function uploadBackup(ev) {
+  const f = ev.target.files[0];
+  if (!f) return;
+  if (!isAdmin) { toast("Nur Admin", "err"); return; }
+  if (!confirm(
+    "ACHTUNG: Der aktuelle Datenbestand wird komplett überschrieben.\n" +
+    "Hast du vorher ein aktuelles Backup heruntergeladen?\n\n" +
+    "Mit OK wirklich einspielen."
+  )) {
+    ev.target.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const body = JSON.parse(reader.result);
+      const res = await fetch("api/backup.php", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || ("HTTP " + res.status));
+      }
+      toast("✓ Backup eingespielt: " + (data.data.eintraege || 0) + " Einträge");
+      await reloadDaten();
+      abschussplan = {};  // Plan-Cache leeren, wird neu geladen
+      await ensurePlan(selectedYear);
+      updateYearTabs();
+      anzeigen();
+    } catch (err) {
+      alert("Einspielen fehlgeschlagen: " + err.message);
+    }
+    ev.target.value = "";
+  };
+  reader.readAsText(f);
+}
+
 function exportExcel() {
   const year = document.getElementById("exportYear").value;
 
