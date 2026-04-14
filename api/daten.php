@@ -62,10 +62,10 @@ function entryIsLocked(array $entry): bool {
 if ($method === 'GET') {
     $jahr = isset($_GET['jahr']) ? (int) $_GET['jahr'] : 0;
     if ($jahr > 0) {
-        $s = $pdo->prepare('SELECT * FROM eintraege WHERE jahr = :j ORDER BY datum DESC, id DESC');
+        $s = $pdo->prepare('SELECT * FROM eintraege WHERE jahr = :j ORDER BY datum DESC, zeit DESC, id DESC');
         $s->execute([':j' => $jahr]);
     } else {
-        $s = $pdo->query('SELECT * FROM eintraege ORDER BY datum DESC, id DESC');
+        $s = $pdo->query('SELECT * FROM eintraege ORDER BY datum DESC, zeit DESC, id DESC');
     }
     $rows = $s->fetchAll();
     // Typen hart setzen (s. loadEntry)
