@@ -476,6 +476,9 @@ tr:hover { background: var(--gruen-l); }
   justify-content: center;
 }
 .bottom-nav .bn-fab:hover { background: var(--gruen-d) !important; }
+/* FAB wird per JS nur in Revier/Park eingeblendet. Hier eine defensive
+   Regel, falls irgendwo eine andere CSS-Kaskade reinfunkt. */
+.bottom-nav.no-fab .bn-fab { display: none !important; }
 
 /* Platz für Bottom-Nav schaffen, damit der letzte Inhalt nicht darunter verschwindet */
 body.has-bottom-nav .container { padding-bottom: 90px; }
@@ -664,7 +667,7 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   <button data-page="revier" onclick="bnGo('revier')">
     <span class="bn-icon">🎯</span><span class="bn-lbl">Revier</span>
   </button>
-  <button class="bn-fab" onclick="bnNewEntry()" title="Neuer Eintrag">
+  <button class="bn-fab" onclick="bnNewEntry()" title="Neuer Eintrag" style="display:none;">
     <span class="bn-icon">➕</span>
   </button>
   <button data-page="park" onclick="bnGo('park')">
@@ -3158,9 +3161,12 @@ function updateBottomNav() {
 
   // FAB nur anzeigen, wenn wir in der Revier- oder Park-Liste sind -
   // sonst wüsste der User nicht, in welchem Bereich der Eintrag
-  // angelegt wird.
+  // angelegt wird. Doppelt abgesichert per CSS-Klasse UND
+  // inline-style.
+  const showFab = (pageId === "revier");
+  nav.classList.toggle("no-fab", !showFab);
   const fab = nav.querySelector(".bn-fab");
-  if (fab) fab.style.display = (pageId === "revier") ? "" : "none";
+  if (fab) fab.style.display = showFab ? "flex" : "none";
 
   // Aktiven Button markieren
   nav.querySelectorAll("button[data-page]").forEach(btn => {
