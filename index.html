@@ -423,6 +423,63 @@ tr:hover { background: var(--gruen-l); }
 
 .hint { font-size: 12px; color: #555; margin: 6px 0; }
 
+/* Bottom-Navigation (mobil-first, auch auf Desktop sichtbar) */
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 600px;
+  background: rgba(255,255,255,0.97);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.18);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 6px 8px 8px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 900;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  gap: 2px;
+}
+.bottom-nav button {
+  flex: 1 1 auto;
+  background: transparent;
+  color: var(--grau);
+  margin: 0;
+  padding: 6px 2px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  border: none;
+  border-radius: 8px;
+  min-width: 0;
+}
+.bottom-nav button:hover { background: #e8f5e9; }
+.bottom-nav button.active { color: var(--gruen-d); background: #e8f5e9; }
+.bottom-nav .bn-icon { font-size: 22px; line-height: 1; }
+.bottom-nav .bn-lbl { white-space: nowrap; }
+.bottom-nav .bn-fab {
+  flex: 0 0 auto;
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  background: var(--gruen) !important;
+  color: #fff !important;
+  font-size: 30px !important;
+  box-shadow: 0 4px 14px rgba(46,125,50,0.45);
+  transform: translateY(-16px);
+  padding: 0;
+  flex-direction: row;
+  justify-content: center;
+}
+.bottom-nav .bn-fab:hover { background: var(--gruen-d) !important; }
+
+/* Platz für Bottom-Nav schaffen, damit der letzte Inhalt nicht darunter verschwindet */
+body.has-bottom-nav .container { padding-bottom: 90px; }
+
 /* Toast-Benachrichtigungen */
 .toast-box {
   position: fixed;
@@ -524,6 +581,9 @@ tr:hover { background: var(--gruen-l); }
 .stat-box:active { transform: scale(0.97); }
 .stat-box.active { background: var(--gruen); border-color: var(--gruen-d); }
 .stat-box.active .num, .stat-box.active .lbl { color: #fff; }
+.stat-box.stat-fallwild { background: #ffe0e0; }
+.stat-box.stat-fallwild .num { color: #b71c1c; }
+.stat-box.stat-fallwild.active { background: #b71c1c; border-color: #b71c1c; }
 .stat-box .num { font-size: 1.5em; font-weight: bold; color: var(--gruen-d); }
 .stat-box .lbl { font-size: 11px; color: var(--grau); }
 
@@ -573,6 +633,16 @@ tr:hover { background: var(--gruen-l); }
 .meld-table td:first-child { text-align: left; }
 .meld-table td:last-child { text-align: right; }
 
+/* Revier-Header (kompakter Titel im Revier- und Park-Modus) */
+.revier-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px;
+}
+.revier-header h2 {
+  margin: 0; font-size: 18px; color: var(--gruen-d);
+}
+.revier-header h2 span { color: var(--grau); font-weight: normal; font-size: 15px; }
+
 /* Hervorhebung gemeldeter Einträge */
 .row-gemeldet td { background: #fff8e1 !important; }
 .card-gemeldet { background: #fff8e1; border-left: 4px solid #c62828; }
@@ -585,6 +655,25 @@ tr:hover { background: var(--gruen-l); }
 
 <!-- Toast-Container für Erfolgsmeldungen -->
 <div id="toastBox" class="toast-box"></div>
+
+<!-- Mobile Bottom-Navigation -->
+<nav id="bottomNav" class="bottom-nav" style="display:none;">
+  <button data-page="start" onclick="bnGo('start')">
+    <span class="bn-icon">🏠</span><span class="bn-lbl">Start</span>
+  </button>
+  <button data-page="revier" onclick="bnGo('revier')">
+    <span class="bn-icon">🎯</span><span class="bn-lbl">Revier</span>
+  </button>
+  <button class="bn-fab" onclick="bnNewEntry()" title="Neuer Eintrag">
+    <span class="bn-icon">➕</span>
+  </button>
+  <button data-page="park" onclick="bnGo('park')">
+    <span class="bn-icon">🌲</span><span class="bn-lbl">Park</span>
+  </button>
+  <button onclick="bnMore()">
+    <span class="bn-icon">⋯</span><span class="bn-lbl">Mehr</span>
+  </button>
+</nav>
 
 <div class="container">
 
@@ -608,10 +697,8 @@ tr:hover { background: var(--gruen-l); }
 
 <!-- REVIER -->
 <div id="revier" class="page">
-  <div class="header">
-    <img src="logo.jpg"
-         alt="" style="width:60px;" onerror="this.style.display='none'">
-    <h2 id="revierTitle">Jagdrevier Prad</h2>
+  <div class="revier-header">
+    <h2 id="revierTitle">🎯 Revier · <span id="revierHeaderYear"></span></h2>
     <div id="adminIndicator" style="display:none;">
       <span class="admin-badge">ADMIN</span>
       <span style="font-size:11px;color:var(--grau);cursor:pointer;margin-left:6px;" onclick="adminLogout()">abmelden</span>
@@ -620,13 +707,13 @@ tr:hover { background: var(--gruen-l); }
   <div id="yearTabsContainer" class="year-tabs"></div>
   <div id="statsContainer" class="stats"></div>
   <div class="topbar">
-    <button onclick="neuerEintrag()">➕ Neuer Eintrag</button>
     <button onclick="openMapAll()">🗺️ Karte</button>
     <button id="btnPlan" onclick="openPlanPopup()">📋 Plan</button>
-    <button class="sec" onclick="zeigeSeite('start')">⬅ Zurück</button>
+    <button class="sec" onclick="toggleSuche()" id="btnSucheToggle">🔍</button>
   </div>
   <input id="sucheInput" type="search" placeholder="🔍 Suche: Name, Wildart, Ort…"
-         oninput="onSucheChange()" autocomplete="off" style="margin:6px 0;">
+         oninput="onSucheChange()" autocomplete="off"
+         style="margin:6px 0;display:none;">
   <div class="table-wrapper"><table id="tabelle"></table></div>
   <div class="cards" id="cardsContainer"></div>
 </div>
@@ -968,13 +1055,7 @@ tr:hover { background: var(--gruen-l); }
   <h3>🗺️ Karte Prad</h3>
   <div id="mapContainer" style="position:relative;width:100%;height:380px;
        border-radius:8px;overflow:hidden;"></div>
-  <div class="marker-legend">
-    <span><i style="background:#FFD600"></i>Reh</span>
-    <span><i style="background:#E53935"></i>Rot</span>
-    <span><i style="background:#424242"></i>Gams</span>
-    <span><i style="background:#FF6D00"></i>Fuchs/Hase</span>
-    <span><i style="background:#1E88E5"></i>Sonst</span>
-  </div>
+  <div id="mapLegend" class="marker-legend"></div>
   <p class="hint" id="mapHint">Tippe auf die Karte, um den Abschussort zu markieren.</p>
   <div class="topbar" style="margin-top:6px;">
     <button class="sm sec" onclick="mapUseMyLocation()">📍 Mein Standort</button>
@@ -1191,10 +1272,11 @@ function dbToClient(row) {
     datum:      row.datum || "",
     verwendung: row.verwendung || "",
     entnommen:  row.entnommen || "",
-    abfall:     row.abfall,
-    gemeldet:   !!row.gemeldet,
-    ist_park:   !!row.ist_park,
-    wetter:     row.wetter || "",
+    abfall:       row.abfall,
+    gemeldet:     !!row.gemeldet,
+    ist_park:     !!row.ist_park,
+    ist_fallwild: !!row.ist_fallwild,
+    wetter:       row.wetter || "",
   };
 }
 function clientToDb(ev) {
@@ -1210,10 +1292,11 @@ function clientToDb(ev) {
     datum:      ev.datum,
     verwendung: ev.verwendung,
     entnommen:  ev.entnommen || null,
-    abfall:     ev.abfall,
-    gemeldet:   ev.gemeldet ? 1 : 0,
-    ist_park:   ev.ist_park ? 1 : 0,
-    wetter:     ev.wetter || null,
+    abfall:       ev.abfall,
+    gemeldet:     ev.gemeldet ? 1 : 0,
+    ist_park:     ev.ist_park ? 1 : 0,
+    ist_fallwild: ev.ist_fallwild ? 1 : 0,
+    wetter:       ev.wetter || null,
   };
 }
 
@@ -1260,7 +1343,7 @@ function normalizePlan(raw, kontext) {
   Object.keys(defaults).forEach(art => {
     out[art] = {};
     defaults[art].forEach(k => {
-      out[art][k] = { plan: 0, enabled: true, matches: "" };
+      out[art][k] = { plan: 0, extern: 0, enabled: true, matches: "" };
     });
   });
   // Werte aus raw übernehmen (auch custom Wildarten/Klassen)
@@ -1269,10 +1352,11 @@ function normalizePlan(raw, kontext) {
     Object.keys(raw[art] || {}).forEach(k => {
       const v = raw[art][k];
       if (typeof v === "number") {
-        out[art][k] = { plan: v, enabled: true, matches: "" };
+        out[art][k] = { plan: v, extern: 0, enabled: true, matches: "" };
       } else if (v && typeof v === "object") {
         out[art][k] = {
-          plan:    parseInt(v.plan, 10) || 0,
+          plan:    parseInt(v.plan,   10) || 0,
+          extern:  parseInt(v.extern, 10) || 0,
           enabled: v.enabled !== false,
           matches: (v.matches || "").toString(),
         };
@@ -1351,6 +1435,7 @@ async function init() {
   // Offline-Banner anzeigen + versuchen, Outbox zu leeren
   updateOfflineBanner();
   flushOutbox();
+  updateBottomNav();
 }
 
 function applyConfig() {
@@ -1361,7 +1446,8 @@ function applyConfig() {
 
   // Header texts
   document.querySelectorAll('.header h2')[0].innerHTML = 'Abschussliste<br>' + esc(config.revier);
-  document.getElementById("revierTitle").textContent = config.revier;
+  // revierTitle wird von updateRevierHeader() verwaltet
+  if (typeof updateRevierHeader === "function") updateRevierHeader();
   document.querySelector('.header .code').textContent = 'Zahlencode: ' + config.code;
 
   // Admin indicator
@@ -1415,6 +1501,7 @@ function zeigeSeite(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   const el = document.getElementById(id);
   if (el) el.classList.add("active");
+  if (typeof updateBottomNav === "function") updateBottomNav();
 }
 
 /* ---------- Year ---------- */
@@ -1435,6 +1522,7 @@ function updateYearTabs() {
     s.onclick = async () => {
       selectedYear = y;
       updateYearTabs();
+      updateRevierHeader();
       await ensurePlan(y);
       anzeigen();
     };
@@ -1459,15 +1547,10 @@ function matchesSearch(d, q) {
 async function openRevierMode(mode) {
   appMode = (mode === "park") ? "park" : "revier";
   statsFilter = "";
-  const titleEl = document.getElementById("revierTitle");
-  if (titleEl) {
-    titleEl.textContent = appMode === "park"
-      ? "🌲 Park – " + (config.revier || "Jagdrevier Prad")
-      : (config.revier || "Jagdrevier Prad");
-  }
-  // Such-Input zurücksetzen
+  updateRevierHeader();
+  // Such-Input zurücksetzen und ausblenden
   const sEl = document.getElementById("sucheInput");
-  if (sEl) sEl.value = "";
+  if (sEl) { sEl.value = ""; sEl.style.display = "none"; }
   sucheText = "";
   await ensurePlan(selectedYear);
   updateYearTabs();
@@ -1475,16 +1558,47 @@ async function openRevierMode(mode) {
   zeigeSeite("revier");
 }
 
+function updateRevierHeader() {
+  const titleEl = document.getElementById("revierTitle");
+  const yearEl  = document.getElementById("revierHeaderYear");
+  if (!titleEl) return;
+  const prefix = appMode === "park" ? "🌲 Park" : "🎯 Revier";
+  titleEl.innerHTML = prefix + ' · <span id="revierHeaderYear">'
+                    + selectedYear + '</span>';
+}
+
+function toggleSuche() {
+  const s = document.getElementById("sucheInput");
+  if (!s) return;
+  if (s.style.display === "none" || s.style.display === "") {
+    s.style.display = "block";
+    s.focus();
+  } else {
+    s.style.display = "none";
+    s.value = "";
+    sucheText = "";
+    anzeigen();
+  }
+}
+
 function getFiltered() {
   const isPark = (appMode === "park");
-  const list = daten.filter(d =>
-    d.datum &&
-    new Date(d.datum).getFullYear() === selectedYear &&
-    (!!d.ist_park === isPark) &&
-    (!statsFilter || (d.wildart || "Andere") === statsFilter ||
-     (d.wild || "–") === statsFilter) &&
-    matchesSearch(d, sucheText)
-  );
+  const list = daten.filter(d => {
+    if (!d.datum) return false;
+    if (new Date(d.datum).getFullYear() !== selectedYear) return false;
+    if (!!d.ist_park !== isPark) return false;
+    // Stats-Filter: __fallwild__ zeigt nur Fallwild-Einträge,
+    // andere Filter-Werte zeigen die gewählte Wildart/Klasse (ohne Fallwild).
+    if (statsFilter === "__fallwild__") {
+      if (!d.ist_fallwild) return false;
+    } else if (statsFilter) {
+      if (d.ist_fallwild) return false;
+      if ((d.wildart || "Andere") !== statsFilter &&
+          (d.wild || "–") !== statsFilter) return false;
+    }
+    if (!matchesSearch(d, sucheText)) return false;
+    return true;
+  });
   // Chronologisch: neueste zuerst, bei gleichem Datum nach Schusszeit,
   // bei gleicher Zeit nach id (Tie-Breaker).
   list.sort((a, b) => {
@@ -1544,9 +1658,12 @@ function updateStats() {
     new Date(d.datum).getFullYear() === selectedYear &&
     (!!d.ist_park === isPark)
   );
-  // Im Park gruppieren wir nach Klasse (T-Hirsch ...), im Revier nach Wildart
+  // Im Park gruppieren wir nach Klasse (T-Hirsch ...), im Revier nach Wildart.
+  // Fallwild wird zusätzlich als eigene Kategorie gezählt.
   const counts = {};
+  let fallCount = 0;
   fdAll.forEach(d => {
+    if (d.ist_fallwild) { fallCount++; return; }
     const k = isPark ? (d.wild || "–") : (d.wildart || "Andere");
     counts[k] = (counts[k] || 0) + 1;
   });
@@ -1562,6 +1679,12 @@ function updateStats() {
             <div class="num">${counts[k]}</div><div class="lbl">${esc(k)}</div>
           </div>`;
   });
+  if (fallCount > 0) {
+    const cls = "stat-box stat-fallwild" + (active === "__fallwild__" ? " active" : "");
+    h += `<div class="${cls}" onclick="setStatsFilter('__fallwild__')" title="Nur Fallwild">
+            <div class="num">${fallCount}</div><div class="lbl">☠ Fallwild</div>
+          </div>`;
+  }
   document.getElementById("statsContainer").innerHTML = h;
 }
 
@@ -1800,9 +1923,11 @@ function renderPlanIstTabelle(fd, year) {
   try {
     const plan = getPlan(year) || {};
 
-    // Pro Wildart Ist-Werte pro Wild-Klasse grob vorzählen
+    // Pro Wildart Ist-Werte pro Wild-Klasse grob vorzählen.
+    // Fallwild wird NICHT im Plan gezählt – so gewollt.
     const raw = {};
     fd.forEach(d => {
+      if (d.ist_fallwild) return;  // Fallwild überspringen
       const a = d.wildart || "";
       if (!raw[a]) raw[a] = {};
       const k = d.wild || "–";
@@ -1821,10 +1946,11 @@ function renderPlanIstTabelle(fd, year) {
 
     // Helper: nimmt Wert in alter (int) oder neuer (object) Form
     function rowValues(v) {
-      if (typeof v === "number") return { plan: v, enabled: true, matches: "" };
-      if (!v || typeof v !== "object") return { plan: 0, enabled: true, matches: "" };
+      if (typeof v === "number") return { plan: v, extern: 0, enabled: true, matches: "" };
+      if (!v || typeof v !== "object") return { plan: 0, extern: 0, enabled: true, matches: "" };
       return {
-        plan:    parseInt(v.plan, 10) || 0,
+        plan:    parseInt(v.plan,   10) || 0,
+        extern:  parseInt(v.extern, 10) || 0,
         enabled: v.enabled !== false,
         matches: (v.matches || "").toString(),
       };
@@ -1838,19 +1964,20 @@ function renderPlanIstTabelle(fd, year) {
       if (!enabledRows.length) return;
       anythingShown = true;
       html += `<table class="plan-ist">
-        <tr><th colspan="4">${esc(art)}</th></tr>
-        <tr><th>Klasse</th><th>Plan</th><th>Ist</th><th>Rest</th></tr>`;
-      let sP = 0, sI = 0;
+        <tr><th colspan="5">${esc(art)}</th></tr>
+        <tr><th>Klasse</th><th>Plan</th><th>Ist</th><th>Ext.</th><th>Rest</th></tr>`;
+      let sP = 0, sI = 0, sX = 0;
       enabledRows.forEach(k => {
         const rv = rowValues(grp[k]);
         const p = rv.plan;
         const iv = istFor(art, k, rv.matches);
-        const rest = p - iv;
-        sP += p; sI += iv;
+        const ext = rv.extern;
+        const rest = p - iv - ext;
+        sP += p; sI += iv; sX += ext;
         const cls = (rest < 0) ? ' class="over"' : '';
-        html += `<tr${cls}><td>${esc(k)}</td><td>${p}</td><td>${iv}</td><td>${rest}</td></tr>`;
+        html += `<tr${cls}><td>${esc(k)}</td><td>${p}</td><td>${iv}</td><td>${ext}</td><td>${rest}</td></tr>`;
       });
-      html += `<tr class="sum"><td>Summe</td><td>${sP}</td><td>${sI}</td><td>${sP - sI}</td></tr></table>`;
+      html += `<tr class="sum"><td>Summe</td><td>${sP}</td><td>${sI}</td><td>${sX}</td><td>${sP - sI - sX}</td></tr></table>`;
     });
     if (!anythingShown) {
       html += '<p class="hint">Noch keine Klassen im Plan aktiv. Öffne das Admin-Panel → Abschussplan bearbeiten und hake mindestens eine Klasse an.</p>';
@@ -1897,7 +2024,7 @@ async function renderPlan() {
     html += `<div class="plan-group">
       <h5>${esc(art)} <button class="sm sec" onclick="planAddRow(this,'${esc(art)}')">+ Klasse</button></h5>
       <table class="plan-edit">
-        <tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Zählt als (optional)</th><th></th></tr>`;
+        <tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Extern</th><th>Zählt als</th><th></th></tr>`;
     Object.keys(plan[art]).forEach(k => {
       const row = plan[art][k];
       html += planEditorRow(art, k, row);
@@ -1914,14 +2041,17 @@ async function renderPlan() {
 
 function planEditorRow(art, klasse, row) {
   const checked = row && row.enabled !== false ? "checked" : "";
-  const planVal = row ? (row.plan || 0) : 0;
+  const planVal = row ? (row.plan   || 0) : 0;
+  const extVal  = row ? (row.extern || 0) : 0;
   const matches = row ? (row.matches || "") : "";
   return `<tr data-art="${esc(art)}">
     <td><input type="checkbox" ${checked} class="pe-en"></td>
     <td><input type="text" class="pe-k"  value="${esc(klasse)}" style="width:110px;padding:4px;"></td>
     <td><input type="number" class="pe-p" min="0" value="${planVal}" style="width:60px;padding:4px;"></td>
+    <td><input type="number" class="pe-x" min="0" value="${extVal}"  style="width:60px;padding:4px;"
+         title="Extern erlegte Tiere (werden vom Plan abgezogen, aber nicht als Ist gezählt)"></td>
     <td><input type="text" class="pe-m" value="${esc(matches)}"
-         placeholder="z.B. T-Hirsch,J-Hirsch" style="width:180px;padding:4px;"
+         placeholder="z.B. T-Hirsch,J-Hirsch" style="width:160px;padding:4px;"
          title="Mehrere Wild-Klassen mit Komma trennen, z.B. T-Hirsch,J-Hirsch"></td>
     <td><button class="sm" style="background:#c62828;padding:2px 6px;" onclick="this.closest('tr').remove()">✕</button></td>
   </tr>`;
@@ -1965,6 +2095,7 @@ async function savePlan() {
     if (!kls) return;  // leere Zeilen ignorieren
     const cfg = {
       plan:    parseInt(tr.querySelector(".pe-p").value, 10) || 0,
+      extern:  parseInt(tr.querySelector(".pe-x").value, 10) || 0,
       enabled: tr.querySelector(".pe-en").checked,
       matches: tr.querySelector(".pe-m").value.trim(),
     };
@@ -2382,6 +2513,35 @@ function parkKlasseClass(wild) {
   return 'rot';
 }
 
+/* Legende unter der Karte dynamisch aufbauen - im Park werden
+   die Klassen-Farben gezeigt, im Revier die Wildart-Farben. */
+function renderMapLegend() {
+  const legend = document.getElementById("mapLegend");
+  if (!legend) return;
+  const isPark = (appMode === "park");
+  let items;
+  if (isPark) {
+    items = [
+      ["#8E0000", "T-Hirsch"],
+      ["#FF6D00", "J-Hirsch"],
+      ["#E91E63", "Tier"],
+      ["#AB47BC", "Schmaltier"],
+      ["#FFEB3B", "Kalb"],
+    ];
+  } else {
+    items = [
+      ["#FFD600", "Reh"],
+      ["#E53935", "Rot"],
+      ["#424242", "Gams"],
+      ["#FF6D00", "Fuchs/Hase"],
+      ["#1E88E5", "Sonst"],
+    ];
+  }
+  legend.innerHTML = items.map(
+    ([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`
+  ).join("");
+}
+
 function makeDivIcon(wildart, wild, isPark) {
   const cls = isPark ? parkKlasseClass(wild) : wildartClass(wildart);
   return L.divIcon({
@@ -2402,6 +2562,7 @@ function openMap(mode, idOrNull) {
   document.getElementById("mapOverlay").style.display = "block";
   document.getElementById("mapPopup").style.display = "block";
   document.getElementById("mapHint").style.display = mode === "input" ? "block" : "none";
+  renderMapLegend();
 
   // Auf Mobile kann es einen Moment dauern, bis der Popup-Container
   // seine endgültigen Dimensionen hat. Wir warten bis der Container
@@ -2574,7 +2735,8 @@ function anzeigen() {
     const ri = realIdx(fi);
     const r = t.insertRow();
     if (d.gemeldet) r.classList.add("row-gemeldet");
-    r.insertCell().innerText = (d.gemeldet ? "🔒 " : "") + (d.name||"");
+    r.insertCell().innerText =
+      (d.gemeldet ? "🔒 " : "") + (d.ist_fallwild ? "☠ " : "") + (d.name||"");
     r.insertCell().innerText = d.wildart||"";
     r.insertCell().innerText = d.wild||"";
     r.insertCell().innerText = d.gewicht||"";
@@ -2621,7 +2783,7 @@ function anzeigen() {
     const card = document.createElement("div");
     card.className = "card" + (d.gemeldet ? " card-gemeldet" : "") + (compact ? " card-compact" : "");
     card.dataset.id = ri;
-    const wt = (d.gemeldet ? "🔒 " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
+    const wt = (d.gemeldet ? "🔒 " : "") + (d.ist_fallwild ? "☠ " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
     const ortH = d.latlng
       ? `<span class="link" onclick="event.stopPropagation();openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`
       : esc(d.ort||"");
@@ -2836,6 +2998,13 @@ function openEdit(id) {
         🔒 als gemeldet sperren
       </label>
     </div>
+    <div class="edit-row">
+      <label>Fallwild</label>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-weight:normal;">
+        <input id="ed_fall" type="checkbox" ${d.ist_fallwild ? "checked" : ""} style="width:auto;margin:0;">
+        ☠ als Fallwild markieren (wird nicht im Abschussplan gezählt)
+      </label>
+    </div>
     <div style="margin-top:12px;display:flex;gap:8px;">
       <button onclick="saveEdit(${id})" style="flex:1;">💾 Speichern</button>
       <button class="sec" onclick="closePopups()" style="flex:1;">Abbrechen</button>
@@ -2856,8 +3025,9 @@ async function saveEdit(id) {
     datum:      document.getElementById("ed_datum").value,
     entnommen:  document.getElementById("ed_ent").value || null,
     verwendung: document.getElementById("ed_verw").value,
-    abfall:     a === "" ? null : a,
-    gemeldet:   document.getElementById("ed_gem").checked ? 1 : 0,
+    abfall:       a === "" ? null : a,
+    gemeldet:     document.getElementById("ed_gem").checked ? 1 : 0,
+    ist_fallwild: document.getElementById("ed_fall").checked ? 1 : 0,
   };
   console.log('[Edit] saveEdit id=', id, 'body=', body);
   try {
@@ -2903,6 +3073,104 @@ function toggleCardExpand(cardEl) {
   // Nur kompakt-Karten sind klappbar
   if (!cardEl.classList.contains("card-compact")) return;
   cardEl.classList.toggle("expanded");
+}
+
+/* ---------- Bottom-Navigation ---------- */
+function bnGo(where) {
+  if (where === "start") {
+    zeigeSeite("start");
+  } else if (where === "revier") {
+    openRevierMode("revier");
+  } else if (where === "park") {
+    openRevierMode("park");
+  }
+  updateBottomNav();
+}
+
+function bnNewEntry() {
+  // Wenn wir nicht in Revier/Park sind, zuerst dorthin wechseln und
+  // dann den neuen Eintrag starten. Wenn bereits dort: direkt neuer Eintrag.
+  const startNew = () => { neuerEintrag(); };
+  const currentPage = document.querySelector(".page.active");
+  const pageId = currentPage ? currentPage.id : "";
+  if (pageId === "revier") {
+    startNew();
+  } else {
+    // Default: in den aktuellen appMode (oder Revier) wechseln
+    openRevierMode(appMode || "revier").then(startNew).catch(startNew);
+  }
+}
+
+function bnMore() {
+  const ov = document.createElement("div");
+  ov.style.cssText =
+    "position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;display:block;";
+  const box = document.createElement("div");
+  box.style.cssText =
+    "position:fixed;left:50%;bottom:100px;transform:translateX(-50%);" +
+    "background:#fff;padding:14px;border-radius:14px;" +
+    "box-shadow:0 10px 40px rgba(0,0,0,0.35);" +
+    "z-index:1000;display:flex;flex-direction:column;gap:6px;" +
+    "min-width:260px;max-width:92%;";
+  const close = () => { ov.remove(); box.remove(); };
+  ov.onclick = close;
+  box.onclick = ev => ev.stopPropagation();
+  const items = [];
+  items.push({ icon: "🗺", label: "Karte", action: () => { close(); openMapAll(); } });
+  if (config.planVisible !== false || isAdmin) {
+    items.push({ icon: "📋", label: "Plan", action: () => { close(); openPlanPopup(); } });
+  }
+  items.push({ icon: "❓", label: "Hilfe", action: () => { close(); openHelp(); } });
+  if (isAdmin) {
+    items.push({ icon: "⚙️", label: "Admin-Einstellungen", action: () => { close(); showLogin(); } });
+    items.push({ icon: "🔓", label: "Admin abmelden", action: () => { close(); adminLogoutFull(); } });
+  } else {
+    items.push({ icon: "🔐", label: "Admin-Login", action: () => { close(); showLogin(); } });
+  }
+  box.innerHTML = '<div style="font-size:13px;color:#666;margin-bottom:4px;text-align:center;">Mehr Aktionen</div>';
+  items.forEach(it => {
+    const b = document.createElement("button");
+    b.className = "sec";
+    b.style.cssText = "text-align:left;margin:0;display:flex;align-items:center;gap:10px;";
+    b.innerHTML = `<span style="font-size:20px;width:28px;text-align:center;">${it.icon}</span>${esc(it.label)}`;
+    b.onclick = it.action;
+    box.appendChild(b);
+  });
+  document.body.appendChild(ov);
+  document.body.appendChild(box);
+}
+
+/* Aktualisiert den aktiven Button der Bottom-Nav basierend auf
+   der aktuellen Seite + appMode. Blendet die Bottom-Nav während
+   des Workflow-Schritts aus (damit der FAB nicht mit dem Weiter-
+   Button konkurriert). */
+function updateBottomNav() {
+  const nav = document.getElementById("bottomNav");
+  if (!nav) return;
+  const currentPage = document.querySelector(".page.active");
+  const pageId = currentPage ? currentPage.id : "";
+  // Während des Workflows oder im Admin-Login die Bottom-Nav ausblenden
+  const hideOn = ["admin-login"];
+  const isWorkflow = pageId.startsWith("wf-");
+  const hidden = isWorkflow || hideOn.includes(pageId);
+  nav.style.display = hidden ? "none" : "flex";
+  document.body.classList.toggle("has-bottom-nav", !hidden);
+
+  // Aktiven Button markieren
+  nav.querySelectorAll("button[data-page]").forEach(btn => {
+    const p = btn.dataset.page;
+    let active = false;
+    if (p === "start")  active = (pageId === "start");
+    if (p === "revier") active = (pageId === "revier" && appMode !== "park");
+    if (p === "park")   active = (pageId === "revier" && appMode === "park");
+    btn.classList.toggle("active", active);
+  });
+  // Park-Button versteckt halten, wenn Admin ihn so konfiguriert hat
+  const parkBtn = nav.querySelector('button[data-page="park"]');
+  if (parkBtn) {
+    const parkVisible = (config.parkVisible !== false) || isAdmin;
+    parkBtn.style.display = parkVisible ? "" : "none";
+  }
 }
 
 function adminTab(id) {

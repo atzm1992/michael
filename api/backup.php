@@ -64,7 +64,7 @@ if ($method === 'POST') {
         // Einträge wieder einspielen
         $cols = ['id','name','wildart','wild','gewicht','ort',
                  'koord_x','koord_y','koord_lat','koord_lng','wetter',
-                 'zeit','datum','verwendung','entnommen','abfall','gemeldet','ist_park'];
+                 'zeit','datum','verwendung','entnommen','abfall','gemeldet','ist_park','ist_fallwild'];
         $sql  = 'INSERT INTO eintraege (' . implode(',', $cols) . ') VALUES (:'
               . implode(', :', $cols) . ')';
         $stmt = $pdo->prepare($sql);
@@ -77,7 +77,7 @@ if ($method === 'POST') {
 
         // Plan wieder einspielen
         if (!empty($in['abschussplan']) && is_array($in['abschussplan'])) {
-            $pCols = ['jahr','kontext','wildart','klasse','plan_anzahl','enabled','matches','sort_order'];
+            $pCols = ['jahr','kontext','wildart','klasse','plan_anzahl','extern','enabled','matches','sort_order'];
             $pSql  = 'INSERT INTO abschussplan (' . implode(',', $pCols) . ') VALUES (:'
                    . implode(', :', $pCols) . ')';
             $pStmt = $pdo->prepare($pSql);
