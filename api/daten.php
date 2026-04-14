@@ -23,7 +23,7 @@ $pdo = db();
 /* Felder, die aus einem Eintrag-Body übernommen werden */
 $ALLOWED = ['name','wildart','wild','gewicht','ort',
             'koord_x','koord_y','koord_lat','koord_lng',
-            'zeit','datum','verwendung','entnommen','abfall','gemeldet'];
+            'zeit','datum','verwendung','entnommen','abfall','gemeldet','wetter'];
 
 function fromRequest(array $src, array $allowed): array {
     $out = [];
@@ -31,7 +31,7 @@ function fromRequest(array $src, array $allowed): array {
         if (array_key_exists($k, $src)) {
             $v = $src[$k];
             // Leerstrings für Zahlen/Datum in NULL
-            $nullable = ['gewicht','koord_x','koord_y','koord_lat','koord_lng','entnommen','abfall'];
+            $nullable = ['gewicht','koord_x','koord_y','koord_lat','koord_lng','entnommen','abfall','wetter'];
             if ($v === '' && in_array($k, $nullable, true)) {
                 $v = null;
             }

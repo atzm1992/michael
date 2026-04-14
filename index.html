@@ -841,6 +841,7 @@ function dbToClient(row) {
     entnommen:  row.entnommen || "",
     abfall:     row.abfall,
     gemeldet:   !!row.gemeldet,
+    wetter:     row.wetter || "",
   };
 }
 function clientToDb(ev) {
@@ -858,6 +859,7 @@ function clientToDb(ev) {
     entnommen:  ev.entnommen || null,
     abfall:     ev.abfall,
     gemeldet:   ev.gemeldet ? 1 : 0,
+    wetter:     ev.wetter || null,
   };
 }
 
@@ -1366,6 +1368,8 @@ async function finishSave() {
     await ensurePlan(selectedYear);
     updateYearTabs();
     anzeigen();
+    // Wetter im Hintergrund nachladen (falls wir GPS haben)
+    fetchWetterForEntry(row.id).catch(() => {});
     e = {};
     aktuellerPunkt = null;
     zeigeSeite("revier");
@@ -1638,6 +1642,7 @@ function anzeigen() {
         <div><span class="label">Datum</span><br>${formatDatum(d.datum)}</div>
         <div><span class="label">Verwendung</span><br>${esc(d.verwendung||"–")}</div>
       </div>
+      ${d.wetter ? `<div style="font-size:11px;color:var(--grau);margin-top:4px;">🌡️ ${esc(d.wetter)}</div>` : ''}
       <div class="card-actions">${entH} ${abfH}</div>`;
     cc.appendChild(card);
   });
@@ -1877,6 +1882,68 @@ async function changePassword() {
   } catch (err) {
     alert("Passwort-Wechsel fehlgeschlagen: " + err.message);
   }
+}
+
+/* ---------- Wetter via Open-Meteo (kostenlos, kein API-Key) ---------- */
+async function fetchWetterForEntry(id) {
+  const d = daten.find(x => x.id === id);
+  if (!d || !d.latlng || !d.datum || !d.zeit) return;
+  // Stunde aus der Schusszeit extrahieren (HH:MM -> HH)
+  const hh = parseInt(d.zeit.slice(0, 2), 10);
+  if (isNaN(hh)) return;
+
+  const url = 'https://api.open-meteo.com/v1/forecast'
+    + '?latitude=' + encodeURIComponent(d.latlng.lat)
+    + '&longitude=' + encodeURIComponent(d.latlng.lng)
+    + '&hourly=temperature_2m,wind_speed_10m,precipitation,weather_code'
+    + '&start_date=' + d.datum + '&end_date=' + d.datum
+    + '&timezone=Europe%2FRome';
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const h = data.hourly || {};
+    if (!h.time || !h.time.length) return;
+
+    // Index finden, dessen Stunde zur Schusszeit passt
+    let idx = h.time.findIndex(t => t.endsWith('T' + String(hh).padStart(2,'0') + ':00'));
+    if (idx < 0) idx = 0;
+
+    const t  = Math.round((h.temperature_2m?.[idx] ?? 0) * 10) / 10;
+    const w  = Math.round((h.wind_speed_10m?.[idx] ?? 0));
+    const p  = h.precipitation?.[idx] ?? 0;
+    const wc = h.weather_code?.[idx];
+
+    const text = t + '°C · Wind ' + w + ' km/h'
+               + (p > 0 ? ' · Niederschlag ' + p + ' mm' : '')
+               + (wc != null ? ' · ' + wetterCodeText(wc) : '');
+
+    // Eintrag aktualisieren (kein Alarm wenn es scheitert)
+    try {
+      const row = await api.updateEintrag(id, { wetter: text });
+      applyRow(row);
+      anzeigen();
+    } catch (_) {}
+  } catch (_) {
+    // Wetter nicht essenziell - Fehler still schlucken
+  }
+}
+
+function wetterCodeText(c) {
+  // Open-Meteo WMO-Codes, grob übersetzt
+  if (c === 0) return 'klar';
+  if (c === 1 || c === 2) return 'leicht bewölkt';
+  if (c === 3) return 'bedeckt';
+  if (c >= 45 && c <= 48) return 'Nebel';
+  if (c >= 51 && c <= 57) return 'Nieselregen';
+  if (c >= 61 && c <= 65) return 'Regen';
+  if (c >= 66 && c <= 67) return 'gefrierender Regen';
+  if (c >= 71 && c <= 77) return 'Schnee';
+  if (c >= 80 && c <= 82) return 'Regenschauer';
+  if (c >= 85 && c <= 86) return 'Schneeschauer';
+  if (c >= 95) return 'Gewitter';
+  return '';
 }
 
 /* ---------- Druckansicht (für amtliche Abschussmeldung) ---------- */
