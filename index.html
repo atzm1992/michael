@@ -631,7 +631,9 @@ tr:hover { background: var(--gruen-l); }
 
 <!-- ADMIN PANEL -->
 <div id="admin" class="page">
-  <h3>⚙️ Admin-Einstellungen</h3>
+  <h3>⚙️ Admin-Einstellungen
+    <button class="sm sec" style="float:right;" onclick="openHelp()">❓ Hilfe</button>
+  </h3>
 
   <div class="admin-section">
     <h4>Allgemein</h4>
@@ -942,7 +944,7 @@ function dbToClient(row) {
     if (!isNaN(f) && isFinite(f)) lng = f;
   }
   return {
-    id:         row.id,
+    id:         Number(row.id),   // immer als Zahl speichern
     name:       row.name || "",
     wildart:    row.wildart || "",
     wild:       row.wild || "",
@@ -1245,6 +1247,132 @@ function updateStats() {
 }
 
 /* Popup: Abschussplan für das gewählte Jahr anzeigen */
+/* Hilfe-Popup für den Admin */
+function openHelp() {
+  const ov = document.createElement("div");
+  ov.style.cssText =
+    "position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;display:block;";
+  const box = document.createElement("div");
+  box.style.cssText =
+    "position:fixed;left:4%;right:4%;top:3vh;" +
+    "max-height:94vh;overflow-y:auto;" +
+    "background:#fff;padding:18px;border-radius:12px;" +
+    "box-shadow:0 10px 40px rgba(0,0,0,0.4);" +
+    "z-index:1000;display:block;" +
+    "-webkit-overflow-scrolling:touch;";
+  ov.onclick = () => { ov.remove(); box.remove(); };
+  box.onclick = ev => ev.stopPropagation();
+  box.innerHTML = `
+    <h3>❓ Hilfe – Jagdrevier Prad</h3>
+
+    <h4>🎯 Neuen Eintrag anlegen</h4>
+    <p>Im Revier-Tab auf <b>➕ Neuer Eintrag</b>. Du gehst der Reihe nach
+    durch: Erleger → Wildart → Klasse → Gewicht → Ort → Zeit → Datum →
+    Verwendung → Zusammenfassung → Speichern. Datum und Uhrzeit sind immer
+    auf „jetzt" vorausgefüllt, du musst sie nur ändern, wenn nötig.</p>
+
+    <h4>📍 Ort setzen</h4>
+    <p>Drei Wege:</p>
+    <ul>
+      <li><b>📡 Jetzt hier</b>: per GPS deinen aktuellen Standort übernehmen
+          (funktioniert nur draußen mit Empfang und HTTPS).</li>
+      <li><b>🗺️ Karte öffnen</b>: Karte anzeigen, auf den Erlegungsort tippen,
+          OK.</li>
+      <li><b>Andere</b>: Ortsname frei eingeben, wenn es nicht in Prad war.</li>
+    </ul>
+
+    <h4>❄️ Wildkühlkammer</h4>
+    <p>Auf der Startseite siehst du, wie viele Tiere aktuell eingelagert und
+    noch nicht entnommen sind – gruppiert nach Wildart.</p>
+
+    <h4>📊 Statistik-Kacheln als Filter</h4>
+    <p>Im Revier-Tab kannst du auf „Rehwild 3", „Rotwild 2" usw. klicken –
+    die Tabelle zeigt dann nur diese Wildart. Nochmal klicken oder auf
+    „Gesamt" → Filter aus.</p>
+
+    <h4>🔒 Eintrag „gemeldet" sperren</h4>
+    <p>Gemeldete Einträge sind gegen versehentliche Änderungen geschützt.
+    Typischer Ablauf:</p>
+    <ol>
+      <li>Jäger trägt den Abschuss ein (offen, bearbeitbar).</li>
+      <li>Ende des Monats / Quartals reichst du die Liste als PDF beim
+          Jagdverband ein (🖨 Drucken im Admin-Panel).</li>
+      <li>Danach setzt du im Admin unter „Einträge gemeldet markieren"
+          bei allen gemeldeten Einträgen 🔒. Dadurch kann niemand mehr
+          aus Versehen Entnahme, Abfall oder Verwendung dieser Einträge
+          ändern.</li>
+      <li>Nur der Admin kann die Sperre wieder aufheben oder den Eintrag
+          weiterhin bearbeiten.</li>
+    </ol>
+    <p>So bleibt dokumentiert: „was wurde offiziell gemeldet" vs. „was ist
+    noch im Fluss".</p>
+
+    <h4>📋 Abschussplan</h4>
+    <p>Im Admin unter „Abschussplan bearbeiten":</p>
+    <ul>
+      <li>Pro Wildart gibt es eine Tabelle mit Klassen.</li>
+      <li>Das Häkchen <b>✓</b> bestimmt, ob eine Klasse im Plan-Popup angezeigt
+          und gezählt wird. Deaktivierte Klassen bleiben gespeichert, werden
+          aber ignoriert.</li>
+      <li><b>Plan</b> = die Sollzahl vom Jagdbezirk.</li>
+      <li><b>Zählt als</b> = optional. Gibt an, welche Wild-Klassen in diese
+          Zeile als Ist-Wert einfließen. Mehrere durch <b>Komma</b> trennen.
+          Beispiel: eine Zeile „Männlich" mit <code>T-Hirsch,J-Hirsch</code>
+          zählt beide Klassen zusammen.</li>
+      <li><b>+ Klasse</b> fügt eine Zeile hinzu, <b>+ neue Wildart</b> eine
+          komplette Gruppe (z.B. Schwarzwild).</li>
+      <li>Das ✕ am Zeilenende löscht eine Zeile.</li>
+      <li>Nach dem Bearbeiten auf <b>💾 Plan speichern</b>.</li>
+    </ul>
+
+    <h4>🖨 Drucken / PDF-Export</h4>
+    <p>Im Admin unter „Daten exportieren / drucken" wählst du ein Jahr und
+    klickst auf <b>🖨 Drucken / PDF</b>. Es erscheint eine querformatige
+    A4-Liste für die amtliche Meldung. Im Browser-Druck-Dialog kannst du
+    entweder echt drucken oder „Als PDF speichern".</p>
+    <p>Alternativ liefert <b>📊 CSV/Excel</b> eine CSV-Datei zum Öffnen in
+    Excel.</p>
+
+    <h4>🗺️ Karte</h4>
+    <p>Im Revier-Tab auf <b>🗺️ Karte</b>. Zeigt alle Abschüsse des aktuell
+    gewählten Jahres als farbige Punkte auf OpenStreetMap. Mit <b>📍 Mein
+    Standort</b> kannst du zu deiner aktuellen Position springen.</p>
+    <p>Einzelne Einträge kannst du in der Tabelle über den Ortsnamen-Link
+    direkt auf der Karte ansehen.</p>
+
+    <h4>🔐 Admin-Login</h4>
+    <p>Oben rechts der Button 🔐. Standard: Benutzer <code>admin</code>,
+    Passwort <code>1234</code>. Unter „Passwort ändern" kannst du es ändern –
+    das alte Passwort wird zur Bestätigung nochmal abgefragt.</p>
+    <p>Ohne Admin-Login kann jeder Einträge anlegen, Entnahme und Abfall
+    setzen. Nur Admin kann <b>bearbeiten, löschen, sperren, Plan pflegen</b>
+    und <b>drucken</b>.</p>
+
+    <h4>📴 Offline-Modus</h4>
+    <p>Die App ist als PWA gebaut: installierbar auf dem Handy-Startbildschirm
+    („Zum Startbildschirm hinzufügen" im Browser-Menü), und funktioniert auch
+    ohne Internet. Einträge, die offline angelegt werden, landen in einer
+    Warteschlange und werden automatisch hochgeladen, sobald wieder Empfang
+    da ist. Ein orangener Banner unten zeigt das an.</p>
+
+    <h4>🌡️ Wetter</h4>
+    <p>Wenn der Abschussort per GPS oder Karte gesetzt ist, holt die App nach
+    dem Speichern automatisch die Wetterlage (Temperatur, Wind) für den
+    Schusszeitpunkt von Open-Meteo und hängt sie an den Eintrag.</p>
+
+    <div style="margin-top:16px;text-align:right;">
+      <button onclick="this.closest('div').parentElement.remove();
+                       this.closest('div').parentElement.nextElementSibling &&
+                       this.closest('div').parentElement.nextElementSibling.remove()">Schließen</button>
+    </div>
+  `;
+  // Einfacherer Schließen-Handler: ersetze den komplizierten onclick oben
+  const schliessen = box.querySelector('button[onclick*="remove"]');
+  if (schliessen) schliessen.onclick = () => { ov.remove(); box.remove(); };
+  document.body.appendChild(ov);
+  document.body.appendChild(box);
+}
+
 async function openPlanPopup() {
   await ensurePlan(selectedYear);
   const fd = getFiltered();
@@ -1330,9 +1458,10 @@ async function renderPlan() {
   await ensurePlan(y);
   const plan = getPlan(y);
 
-  let html = '<p class="hint">Hake ab, welche Klassen gezählt werden sollen. '
-           + 'Über „Zählt als" kannst du eine Zeile definieren, die mehrere '
-           + 'Wild-Klassen zusammenfasst (z.B. „T-Hirsch,J-Hirsch" für männliches Rotwild).</p>';
+  let html = '<p class="hint">✓ = wird im Plan gezählt.<br>'
+           + '„Zählt als" ist optional und fasst mehrere Wild-Klassen zu einer Zeile zusammen.<br>'
+           + 'Mehrere durch <b>Komma</b> trennen, z.B.: <code>T-Hirsch,J-Hirsch</code> ergibt eine Zeile „Männlich".<br>'
+           + 'Leer lassen heißt: nur Einträge mit genau diesem Klassennamen werden gezählt.</p>';
 
   Object.keys(plan).forEach(art => {
     html += `<div class="plan-group">
@@ -1361,7 +1490,9 @@ function planEditorRow(art, klasse, row) {
     <td><input type="checkbox" ${checked} class="pe-en"></td>
     <td><input type="text" class="pe-k"  value="${esc(klasse)}" style="width:110px;padding:4px;"></td>
     <td><input type="number" class="pe-p" min="0" value="${planVal}" style="width:60px;padding:4px;"></td>
-    <td><input type="text" class="pe-m" value="${esc(matches)}" placeholder="leer = nur sich selbst" style="width:180px;padding:4px;"></td>
+    <td><input type="text" class="pe-m" value="${esc(matches)}"
+         placeholder="z.B. T-Hirsch,J-Hirsch" style="width:180px;padding:4px;"
+         title="Mehrere Wild-Klassen mit Komma trennen, z.B. T-Hirsch,J-Hirsch"></td>
     <td><button class="sm" style="background:#c62828;padding:2px 6px;" onclick="this.closest('tr').remove()">✕</button></td>
   </tr>`;
 }
@@ -1460,7 +1591,8 @@ function renderMeldListe() {
 }
 
 async function toggleGemeldet(id) {
-  const d = daten.find(x => x.id === id);
+  id = Number(id);
+  const d = daten.find(x => Number(x.id) === id);
   if (!d) { alert("Eintrag #" + id + " nicht gefunden."); return; }
   try {
     // Server erwartet truthy/falsy; explizit als 1/0 schicken, damit
@@ -1660,7 +1792,8 @@ async function finishSave() {
 
 /* ---------- Gemeldet-Sperre ---------- */
 function istGesperrt(id) {
-  const d = daten.find(x => x.id === id);
+  id = Number(id);
+  const d = daten.find(x => Number(x.id) === id);
   return d && d.gemeldet === true && !isAdmin;
 }
 function alertGesperrt() {
@@ -1838,14 +1971,8 @@ function setupMapMarkers(mode) {
 }
 function openMapAll() { openMap("view"); }
 function openMapFromTable(id) {
-  // Eintrag SOFORT beim Klick stashen, damit setupMapMarkers nicht mehr
-  // auf daten.find angewiesen ist. So geht es auch dann, wenn sich
-  // zwischen Klick und setupMapMarkers irgendwas an der Liste ändert.
-  singleViewEntry = daten.find(x => x.id === id) || null;
-  if (!singleViewEntry) {
-    // Fallback: Typ-lose Suche (falls id als String im DOM steht)
-    singleViewEntry = daten.find(x => String(x.id) === String(id)) || null;
-  }
+  id = Number(id);
+  singleViewEntry = daten.find(x => Number(x.id) === id) || null;
   console.log('[Karte] openMapFromTable id=', id, 'typ=', typeof id,
               'gefunden=', !!singleViewEntry,
               'latlng=', singleViewEntry && singleViewEntry.latlng);
@@ -2030,6 +2157,7 @@ function pickDate(i) {
   else { el.style.display="block"; el.focus(); }
 }
 async function setEntnommen(id, val) {
+  id = Number(id);
   if (istGesperrt(id)) return alertGesperrt();
   if (!val) return;
   try {
@@ -2042,6 +2170,7 @@ async function setEntnommen(id, val) {
 }
 
 function handleAbfall(id) {
+  id = Number(id);
   if (istGesperrt(id)) return alertGesperrt();
   const ov = document.createElement("div");
   ov.style.cssText =
@@ -2063,6 +2192,7 @@ function handleAbfall(id) {
   document.body.appendChild(ov); document.body.appendChild(box);
 }
 async function setAbfall(id, val) {
+  id = Number(id);
   try {
     const row = await api.eintragAction(id, 'abfall', val);
     applyRow(row);
@@ -2082,15 +2212,17 @@ function closePopups() {
 /* ---------- Löschen: NUR Admin ---------- */
 async function loeschen(id) {
   if (!isAdmin) return alert("Nur der Admin kann Einträge löschen.");
-  const d = daten.find(x => x.id === id);
-  if (d && d.gemeldet) {
+  id = Number(id);
+  const d = daten.find(x => Number(x.id) === id);
+  if (!d) { alert("Eintrag #" + id + " nicht gefunden."); return; }
+  if (d.gemeldet) {
     if (!confirm("Dieser Eintrag ist als gemeldet markiert. Trotzdem löschen?")) return;
   } else {
     if (!confirm("Eintrag wirklich löschen?")) return;
   }
   try {
     await api.deleteEintrag(id);
-    const idx = findById(id);
+    const idx = daten.findIndex(x => Number(x.id) === id);
     if (idx >= 0) daten.splice(idx, 1);
     updateYearTabs();
     anzeigen();
@@ -2104,7 +2236,9 @@ async function loeschen(id) {
    ============================================================ */
 function openEdit(id) {
   if (!isAdmin) { alert("Nur der Admin kann Einträge bearbeiten."); return; }
-  const d = daten.find(x => x.id === id);
+  id = Number(id);
+  const d = daten.find(x => Number(x.id) === id);
+  console.log('[Edit] openEdit id=', id, 'found=', !!d, 'daten-ids=', daten.map(x => x.id));
   if (!d) { alert("Eintrag #" + id + " nicht gefunden."); return; }
   const abfV = (d.abfall == null) ? "" : d.abfall;
 

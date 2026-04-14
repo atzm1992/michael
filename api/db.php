@@ -64,11 +64,17 @@ function db(): PDO {
             $CONFIG['db_name']
         );
         try {
-            $pdo = new PDO($dsn, $CONFIG['db_user'], $CONFIG['db_pass'], [
+            $pdoOpts = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
-            ]);
+            ];
+            // Seit PHP 8.1: integers NICHT als Strings zurückgeben, damit
+            // JSON-Antworten "id": 42 (Zahl) liefern, nicht "id": "42".
+            if (defined('PDO::ATTR_STRINGIFY_FETCHES')) {
+                $pdoOpts[PDO::ATTR_STRINGIFY_FETCHES] = false;
+            }
+            $pdo = new PDO($dsn, $CONFIG['db_user'], $CONFIG['db_pass'], $pdoOpts);
         } catch (PDOException $ex) {
             // Der Fehler wird absichtlich NICHT an den Browser zurückgegeben.
             // Für Debug: in PHP-Error-Log schreiben und einen generischen
