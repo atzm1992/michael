@@ -362,6 +362,52 @@ tr:hover { background: var(--gruen-l); }
 
 .hint { font-size: 12px; color: #555; margin: 6px 0; }
 
+/* Admin-Panel */
+.admin-page { padding-bottom: 90px; }  /* Platz für sticky bar */
+.admin-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.admin-header h3 { margin: 0; }
+
+.admin-tabs {
+  display: flex; gap: 4px; overflow-x: auto;
+  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+}
+.admin-tab {
+  flex: 0 0 auto;
+  background: #eeeeee !important; color: #555 !important;
+  padding: 10px 14px;
+  border-radius: 8px 8px 0 0;
+  font-size: 13px;
+  margin: 0;
+  white-space: nowrap;
+}
+.admin-tab.active {
+  background: var(--gruen) !important; color: #fff !important;
+}
+.admin-tab-content { display: none; }
+.admin-tab-content.active { display: block; }
+
+.admin-bottom-bar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex; gap: 8px;
+  background: rgba(255,255,255,0.97);
+  padding: 10px 12px;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
+  z-index: 900;
+  backdrop-filter: blur(6px);
+}
+.admin-bottom-bar button {
+  flex: 1;
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 14px;
+}
+
 .admin-section { margin: 12px 0; padding: 12px; background: #f5f5f5; border-radius: var(--radius); }
 .admin-section h4 { margin-bottom: 8px; color: var(--gruen-d); }
 .admin-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
@@ -630,87 +676,112 @@ tr:hover { background: var(--gruen-l); }
 </div>
 
 <!-- ADMIN PANEL -->
-<div id="admin" class="page">
-  <h3>⚙️ Admin-Einstellungen
-    <button class="sm sec" style="float:right;" onclick="openHelp()">❓ Hilfe</button>
-  </h3>
+<div id="admin" class="page admin-page">
+  <div class="admin-header">
+    <h3>⚙️ Admin-Einstellungen</h3>
+    <button class="sm sec" onclick="openHelp()">❓ Hilfe</button>
+  </div>
 
-  <div class="admin-section">
-    <h4>Allgemein</h4>
-    <div class="admin-row">
-      <label>Reviername:</label>
-      <input id="cfgRevier" value="Jagdrevier Prad">
+  <div class="admin-tabs">
+    <button class="admin-tab active" data-tab="tab-allgemein" onclick="adminTab('tab-allgemein')">🏷️ Allgemein</button>
+    <button class="admin-tab" data-tab="tab-plan" onclick="adminTab('tab-plan')">📋 Plan</button>
+    <button class="admin-tab" data-tab="tab-meld" onclick="adminTab('tab-meld')">🔒 Meldungen</button>
+    <button class="admin-tab" data-tab="tab-export" onclick="adminTab('tab-export')">📊 Export</button>
+  </div>
+
+  <!-- TAB: ALLGEMEIN -->
+  <div id="tab-allgemein" class="admin-tab-content active">
+    <div class="admin-section">
+      <h4>🏷️ Revier</h4>
+      <div class="admin-row">
+        <label>Reviername:</label>
+        <input id="cfgRevier" value="Jagdrevier Prad">
+      </div>
+      <div class="admin-row">
+        <label>Zahlencode:</label>
+        <input id="cfgCode" value="1024">
+      </div>
     </div>
-    <div class="admin-row">
-      <label>Zahlencode:</label>
-      <input id="cfgCode" value="1024">
+
+    <div class="admin-section">
+      <h4>🗑️ Abfall-Hinweis</h4>
+      <div class="admin-row">
+        <textarea id="cfgAbfallText" rows="2" style="font-size:14px;"></textarea>
+      </div>
+      <p class="hint">Wird im Abfall-Dialog angezeigt.</p>
+    </div>
+
+    <div class="admin-section">
+      <h4>👁️ Sichtbarkeit</h4>
+      <div class="admin-row">
+        <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;">
+          <input id="cfgPlanVisible" type="checkbox" style="width:auto;margin:0;">
+          📋 Plan-Button auch für normale Benutzer anzeigen
+        </label>
+      </div>
+      <p class="hint">Ausgeschaltet: Nur der Admin sieht den Plan-Button.</p>
+    </div>
+
+    <div class="admin-section">
+      <h4>🔑 Passwort ändern</h4>
+      <div class="admin-row">
+        <label>Neues Passwort:</label>
+        <input id="cfgNewPass" type="password" placeholder="Neues Passwort">
+      </div>
+      <button class="sm" onclick="changePassword()">Passwort ändern</button>
     </div>
   </div>
 
-  <div class="admin-section">
-    <h4>Abfall-Hinweistext</h4>
-    <div class="admin-row">
-      <textarea id="cfgAbfallText" rows="2" style="font-size:14px;"></textarea>
+  <!-- TAB: ABSCHUSSPLAN -->
+  <div id="tab-plan" class="admin-tab-content">
+    <div class="admin-section">
+      <h4>📋 Abschussplan bearbeiten</h4>
+      <div class="admin-row">
+        <label>Jahr:</label>
+        <select id="planYear" onchange="renderPlan()"></select>
+      </div>
+      <div id="planEditor"></div>
+      <button class="sm" onclick="savePlan()">💾 Plan speichern</button>
     </div>
-    <p class="hint">Wird im Abfall-Dialog angezeigt.</p>
   </div>
 
-  <div class="admin-section">
-    <h4>Sichtbarkeit</h4>
-    <div class="admin-row">
-      <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;">
-        <input id="cfgPlanVisible" type="checkbox" style="width:auto;margin:0;">
-        📋 Plan-Button auch für normale Benutzer anzeigen
-      </label>
+  <!-- TAB: MELDUNGEN -->
+  <div id="tab-meld" class="admin-tab-content">
+    <div class="admin-section">
+      <h4>🔒 Einträge gemeldet markieren</h4>
+      <p class="hint">Gemeldete Einträge sind gegen Änderungen gesperrt (außer für Admin).</p>
+      <div class="admin-row">
+        <label>Jahr:</label>
+        <select id="meldYear" onchange="renderMeldListe()"></select>
+      </div>
+      <div id="meldListe"></div>
     </div>
-    <p class="hint">Ausgeschaltet: Nur der Admin sieht den Plan-Button.</p>
   </div>
 
-  <div class="admin-section">
-    <h4>Passwort ändern</h4>
-    <div class="admin-row">
-      <label>Neues Passwort:</label>
-      <input id="cfgNewPass" type="password" placeholder="Neues Passwort">
+  <!-- TAB: EXPORT -->
+  <div id="tab-export" class="admin-tab-content">
+    <div class="admin-section">
+      <h4>📊 Daten exportieren / drucken</h4>
+      <div class="admin-row">
+        <label>Jahr:</label>
+        <select id="exportYear"></select>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+        <button class="sm" onclick="exportExcel()">📊 CSV/Excel</button>
+        <button class="sm" onclick="openPrintView()">🖨 Drucken / PDF</button>
+      </div>
+      <p class="hint">CSV zum Öffnen in Excel, Drucken für die amtliche Abschussmeldung.</p>
     </div>
-    <button class="sm" onclick="changePassword()">Passwort ändern</button>
   </div>
 
- <div class="admin-section">
-  <h4>Daten exportieren / drucken</h4>
-  <select id="exportYear"></select>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
-    <button class="sm" onclick="exportExcel()">📊 CSV/Excel</button>
-    <button class="sm" onclick="openPrintView()">🖨 Drucken / PDF</button>
-  </div>
-  <p class="hint">CSV zum Importieren in Excel, Drucken für die amtliche Abschussmeldung.</p>
- </div>
+  <!-- Abstand, damit der letzte Inhalt nicht unter der Sticky-Bar verschwindet -->
+  <div style="height:80px;"></div>
 
- <div class="admin-section">
-  <h4>Abschussplan bearbeiten</h4>
-  <div class="admin-row">
-    <label>Jahr:</label>
-    <select id="planYear" onchange="renderPlan()"></select>
-  </div>
-  <div id="planEditor"></div>
-  <button class="sm" onclick="savePlan()">💾 Plan speichern</button>
- </div>
-
- <div class="admin-section">
-  <h4>Einträge gemeldet markieren</h4>
-  <p class="hint">Gemeldete Einträge sind gegen Änderungen gesperrt (außer für Admin).</p>
-  <div class="admin-row">
-    <label>Jahr:</label>
-    <select id="meldYear" onchange="renderMeldListe()"></select>
-  </div>
-  <div id="meldListe"></div>
- </div>
-
-  <div style="margin-top:10px;">
-    <button class="full" onclick="saveConfig()">💾 Einstellungen speichern</button>
-  </div>
-  <div style="margin-top:6px;">
-    <button class="sec full" onclick="adminToRevier()">➡ Zur Liste (eingeloggt)</button>
-    <button class="sec full" onclick="adminLogoutFull()">🔓 Abmelden</button>
+  <!-- Sticky Action-Bar unten -->
+  <div class="admin-bottom-bar">
+    <button onclick="saveConfig()" title="Einstellungen speichern">💾 Speichern</button>
+    <button class="sec" onclick="adminToRevier()" title="Zurück zur Tabelle">➡ Liste</button>
+    <button class="sec" onclick="adminLogoutFull()" title="Admin abmelden">🔓 Abmelden</button>
   </div>
 </div>
 
@@ -2401,6 +2472,15 @@ async function saveEdit(id) {
 /* ============================================================
    ADMIN
    ============================================================ */
+function adminTab(id) {
+  document.querySelectorAll(".admin-tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.tab === id)
+  );
+  document.querySelectorAll(".admin-tab-content").forEach(c =>
+    c.classList.toggle("active", c.id === id)
+  );
+}
+
 function showLogin() {
   if (isAdmin) {
     applyConfig();
