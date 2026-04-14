@@ -5,6 +5,12 @@
 <title>Abschussliste Jagdrevier Prad</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2e7d32">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jagdrevier Prad">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="logo.jpg">
 
 <!-- Leaflet (Open-Source-Karten-Bibliothek, nutzt OpenStreetMap-Tiles) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -736,6 +742,80 @@ tr:hover { background: var(--gruen-l); }
    ABSCHUSSLISTE JAGDREVIER PRAD – V3
    ============================================================ */
 
+/* ---------- PWA: Service Worker registrieren ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err =>
+      console.warn('Service Worker konnte nicht registriert werden:', err)
+    );
+  });
+}
+
+/* ---------- Online/Offline-Indikator ---------- */
+let isOnline = navigator.onLine;
+window.addEventListener('online',  () => { isOnline = true;  flushOutbox(); updateOfflineBanner(); });
+window.addEventListener('offline', () => { isOnline = false; updateOfflineBanner(); });
+
+function updateOfflineBanner() {
+  let b = document.getElementById('offlineBanner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'offlineBanner';
+    b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#f57c00;color:#fff;'
+                    + 'text-align:center;padding:6px;font-size:13px;z-index:1200;'
+                    + 'box-shadow:0 -2px 6px rgba(0,0,0,0.2);';
+    document.body.appendChild(b);
+  }
+  const queued = outboxSize();
+  if (!isOnline) {
+    b.textContent = '📴 Offline — neue Einträge werden gespeichert und später hochgeladen' +
+                    (queued > 0 ? ` (${queued} ausstehend)` : '');
+    b.style.display = 'block';
+  } else if (queued > 0) {
+    b.textContent = `📡 Online — ${queued} Eintrag${queued === 1 ? '' : 'e'} wird/werden synchronisiert…`;
+    b.style.background = '#1565c0';
+    b.style.display = 'block';
+  } else {
+    b.style.display = 'none';
+    b.style.background = '#f57c00';
+  }
+}
+
+/* ---------- Offline-Queue (localStorage, kein IndexedDB für Einfachheit) ---------- */
+function outboxRead() {
+  try { return JSON.parse(localStorage.getItem('outbox') || '[]'); }
+  catch (_) { return []; }
+}
+function outboxWrite(arr) { localStorage.setItem('outbox', JSON.stringify(arr)); }
+function outboxSize() { return outboxRead().length; }
+
+function queueEntry(body) {
+  const q = outboxRead();
+  q.push({ body, t: Date.now() });
+  outboxWrite(q);
+  updateOfflineBanner();
+}
+
+async function flushOutbox() {
+  if (!isOnline) return;
+  const q = outboxRead();
+  if (!q.length) return;
+  const remaining = [];
+  for (const item of q) {
+    try {
+      const row = await api.createEintrag(item.body);
+      // Nur dazuhängen, wenn nicht schon vorhanden (z. B. doppelt auf verschiedenen Geräten)
+      if (typeof applyRow === 'function') applyRow(row);
+    } catch (_) {
+      remaining.push(item);
+    }
+  }
+  outboxWrite(remaining);
+  if (typeof updateYearTabs === 'function') updateYearTabs();
+  if (typeof anzeigen === 'function') anzeigen();
+  updateOfflineBanner();
+}
+
 /* ---------- Kosmetische Client-Konfiguration (bleibt lokal) ---------- */
 let config = JSON.parse(localStorage.getItem("cfg") || '{}');
 // One-time-Migration: alter Name "Jagdverein Prad" → "Jagdrevier Prad"
@@ -868,9 +948,19 @@ async function reloadDaten() {
     const rows = await api.listDaten();
     daten = rows.map(dbToClient);
   } catch (err) {
-    alert("Fehler beim Laden der Daten: " + err.message);
-    daten = [];
+    // Offline-Start: lies die zuletzt bekannten Daten aus dem lokalen Cache
+    try {
+      const cached = JSON.parse(localStorage.getItem("daten_cache") || "[]");
+      daten = Array.isArray(cached) ? cached : [];
+      if (!navigator.onLine) {
+        console.log("Offline-Start mit " + daten.length + " gecachten Einträgen.");
+      } else {
+        console.warn("Server nicht erreichbar – zeige Cache.", err);
+      }
+    } catch (_) { daten = []; }
   }
+  // Cache für Offline aktualisieren
+  try { localStorage.setItem("daten_cache", JSON.stringify(daten)); } catch (_) {}
 }
 
 async function ensurePlan(year) {
@@ -948,6 +1038,10 @@ async function init() {
   applyConfig();
   updateYearTabs();
   anzeigen();
+
+  // Offline-Banner anzeigen + versuchen, Outbox zu leeren
+  updateOfflineBanner();
+  flushOutbox();
 }
 
 function applyConfig() {
@@ -1361,8 +1455,20 @@ async function finishSave() {
   e.entnommen = null;
   e.abfall = null;
   e.gemeldet = false;
+  const body = clientToDb(e);
   try {
-    const row = await api.createEintrag(clientToDb(e));
+    // Wenn offline: direkt in Outbox, ohne API-Versuch
+    if (!navigator.onLine) {
+      queueEntry(body);
+      alert("📴 Offline gespeichert.\nEintrag wird hochgeladen, sobald wieder Internet da ist.");
+      if (e.datum) selectedYear = new Date(e.datum).getFullYear();
+      updateYearTabs();
+      anzeigen();
+      e = {}; aktuellerPunkt = null;
+      zeigeSeite("revier");
+      return;
+    }
+    const row = await api.createEintrag(body);
     applyRow(row);
     if (row.datum) selectedYear = new Date(row.datum).getFullYear();
     await ensurePlan(selectedYear);
@@ -1374,7 +1480,13 @@ async function finishSave() {
     aktuellerPunkt = null;
     zeigeSeite("revier");
   } catch (err) {
-    alert("Speichern fehlgeschlagen: " + err.message);
+    // Server nicht erreichbar obwohl online? Queue stattdessen.
+    queueEntry(body);
+    alert("⚠ Server antwortet nicht — Eintrag wurde offline gespeichert und wird nachgereicht.");
+    updateYearTabs();
+    anzeigen();
+    e = {}; aktuellerPunkt = null;
+    zeigeSeite("revier");
   }
 }
 
