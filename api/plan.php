@@ -55,13 +55,36 @@ if ($method === 'GET') {
     if ($jahr <= 0) jsonErr('jahr fehlt');
 
     $result = emptyPlan($DEFAULT_KLASSEN);
-    $stmt = $pdo->prepare(
-        'SELECT wildart, klasse, plan_anzahl, enabled, matches
-         FROM abschussplan WHERE jahr = :j
-         ORDER BY sort_order, klasse'
-    );
-    $stmt->execute([':j' => $jahr]);
-    foreach ($stmt->fetchAll() as $row) {
+
+    // Defensive: wenn ALTER TABLE-Migrationen in db.php nicht durchliefen,
+    // versuchen wir die "neuen" Spalten zwar zu lesen, fangen aber einen
+    // eventuellen Fehler ab und selektieren stattdessen nur die alten
+    // Spalten.
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT wildart, klasse, plan_anzahl, enabled, matches, sort_order
+             FROM abschussplan WHERE jahr = :j
+             ORDER BY sort_order, klasse'
+        );
+        $stmt->execute([':j' => $jahr]);
+        $rows = $stmt->fetchAll();
+    } catch (PDOException $ex) {
+        // Fallback: nur die alten Spalten, ohne sort_order/enabled/matches
+        $stmt = $pdo->prepare(
+            'SELECT wildart, klasse, plan_anzahl
+             FROM abschussplan WHERE jahr = :j
+             ORDER BY klasse'
+        );
+        $stmt->execute([':j' => $jahr]);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$r) {
+            $r['enabled'] = 1;
+            $r['matches'] = '';
+        }
+        unset($r);
+    }
+
+    foreach ($rows as $row) {
         $art = $row['wildart'];
         $kls = $row['klasse'];
         if (!isset($result[$art])) $result[$art] = [];
