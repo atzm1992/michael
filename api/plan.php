@@ -27,7 +27,7 @@ function emptyPlan(array $defaults): array {
     foreach ($defaults as $art => $klassen) {
         $out[$art] = [];
         foreach ($klassen as $k) {
-            $out[$art][$k] = ['plan' => 0, 'enabled' => true, 'matches' => ''];
+            $out[$art][$k] = ['plan' => 0, 'extern' => 0, 'enabled' => true, 'matches' => ''];
         }
     }
     return $out;
@@ -48,7 +48,7 @@ if ($method === 'GET') {
 
     try {
         $stmt = $pdo->prepare(
-            'SELECT wildart, klasse, plan_anzahl, enabled, matches, sort_order
+            'SELECT wildart, klasse, plan_anzahl, extern, enabled, matches, sort_order
              FROM abschussplan WHERE jahr = :j AND kontext = :kx
              ORDER BY sort_order, klasse'
         );
@@ -92,6 +92,7 @@ if ($method === 'GET') {
         if (!isset($result[$art])) $result[$art] = [];
         $result[$art][$kls] = [
             'plan'    => (int) $row['plan_anzahl'],
+            'extern'  => (int) ($row['extern'] ?? 0),
             'enabled' => (int) ($row['enabled'] ?? 1) === 1,
             'matches' => (string) ($row['matches'] ?? ''),
         ];
@@ -116,15 +117,15 @@ if ($method === 'POST') {
             ->execute([':j' => $jahr, ':kx' => $kontext]);
         $ins = $pdo->prepare(
             'INSERT INTO abschussplan
-             (jahr, kontext, wildart, klasse, plan_anzahl, enabled, matches, sort_order)
-             VALUES (:j, :kx, :w, :k, :n, :e, :m, :s)'
+             (jahr, kontext, wildart, klasse, plan_anzahl, extern, enabled, matches, sort_order)
+             VALUES (:j, :kx, :w, :k, :n, :x, :e, :m, :s)'
         );
         foreach ($plan as $art => $klassen) {
             if (!is_array($klassen)) continue;
             $sort = 0;
             foreach ($klassen as $kls => $cfg) {
                 if (is_int($cfg) || is_string($cfg)) {
-                    $cfg = ['plan' => (int) $cfg, 'enabled' => true, 'matches' => ''];
+                    $cfg = ['plan' => (int) $cfg, 'extern' => 0, 'enabled' => true, 'matches' => ''];
                 }
                 $ins->execute([
                     ':j'  => $jahr,
@@ -132,6 +133,7 @@ if ($method === 'POST') {
                     ':w'  => (string) $art,
                     ':k'  => (string) $kls,
                     ':n'  => (int) ($cfg['plan'] ?? 0),
+                    ':x'  => (int) ($cfg['extern'] ?? 0),
                     ':e'  => !empty($cfg['enabled']) ? 1 : 0,
                     ':m'  => (string) ($cfg['matches'] ?? ''),
                     ':s'  => $sort++,

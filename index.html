@@ -1343,7 +1343,7 @@ function normalizePlan(raw, kontext) {
   Object.keys(defaults).forEach(art => {
     out[art] = {};
     defaults[art].forEach(k => {
-      out[art][k] = { plan: 0, enabled: true, matches: "" };
+      out[art][k] = { plan: 0, extern: 0, enabled: true, matches: "" };
     });
   });
   // Werte aus raw übernehmen (auch custom Wildarten/Klassen)
@@ -1352,10 +1352,11 @@ function normalizePlan(raw, kontext) {
     Object.keys(raw[art] || {}).forEach(k => {
       const v = raw[art][k];
       if (typeof v === "number") {
-        out[art][k] = { plan: v, enabled: true, matches: "" };
+        out[art][k] = { plan: v, extern: 0, enabled: true, matches: "" };
       } else if (v && typeof v === "object") {
         out[art][k] = {
-          plan:    parseInt(v.plan, 10) || 0,
+          plan:    parseInt(v.plan,   10) || 0,
+          extern:  parseInt(v.extern, 10) || 0,
           enabled: v.enabled !== false,
           matches: (v.matches || "").toString(),
         };
@@ -1945,10 +1946,11 @@ function renderPlanIstTabelle(fd, year) {
 
     // Helper: nimmt Wert in alter (int) oder neuer (object) Form
     function rowValues(v) {
-      if (typeof v === "number") return { plan: v, enabled: true, matches: "" };
-      if (!v || typeof v !== "object") return { plan: 0, enabled: true, matches: "" };
+      if (typeof v === "number") return { plan: v, extern: 0, enabled: true, matches: "" };
+      if (!v || typeof v !== "object") return { plan: 0, extern: 0, enabled: true, matches: "" };
       return {
-        plan:    parseInt(v.plan, 10) || 0,
+        plan:    parseInt(v.plan,   10) || 0,
+        extern:  parseInt(v.extern, 10) || 0,
         enabled: v.enabled !== false,
         matches: (v.matches || "").toString(),
       };
@@ -1962,19 +1964,20 @@ function renderPlanIstTabelle(fd, year) {
       if (!enabledRows.length) return;
       anythingShown = true;
       html += `<table class="plan-ist">
-        <tr><th colspan="4">${esc(art)}</th></tr>
-        <tr><th>Klasse</th><th>Plan</th><th>Ist</th><th>Rest</th></tr>`;
-      let sP = 0, sI = 0;
+        <tr><th colspan="5">${esc(art)}</th></tr>
+        <tr><th>Klasse</th><th>Plan</th><th>Ist</th><th>Ext.</th><th>Rest</th></tr>`;
+      let sP = 0, sI = 0, sX = 0;
       enabledRows.forEach(k => {
         const rv = rowValues(grp[k]);
         const p = rv.plan;
         const iv = istFor(art, k, rv.matches);
-        const rest = p - iv;
-        sP += p; sI += iv;
+        const ext = rv.extern;
+        const rest = p - iv - ext;
+        sP += p; sI += iv; sX += ext;
         const cls = (rest < 0) ? ' class="over"' : '';
-        html += `<tr${cls}><td>${esc(k)}</td><td>${p}</td><td>${iv}</td><td>${rest}</td></tr>`;
+        html += `<tr${cls}><td>${esc(k)}</td><td>${p}</td><td>${iv}</td><td>${ext}</td><td>${rest}</td></tr>`;
       });
-      html += `<tr class="sum"><td>Summe</td><td>${sP}</td><td>${sI}</td><td>${sP - sI}</td></tr></table>`;
+      html += `<tr class="sum"><td>Summe</td><td>${sP}</td><td>${sI}</td><td>${sX}</td><td>${sP - sI - sX}</td></tr></table>`;
     });
     if (!anythingShown) {
       html += '<p class="hint">Noch keine Klassen im Plan aktiv. Öffne das Admin-Panel → Abschussplan bearbeiten und hake mindestens eine Klasse an.</p>';
@@ -2021,7 +2024,7 @@ async function renderPlan() {
     html += `<div class="plan-group">
       <h5>${esc(art)} <button class="sm sec" onclick="planAddRow(this,'${esc(art)}')">+ Klasse</button></h5>
       <table class="plan-edit">
-        <tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Zählt als (optional)</th><th></th></tr>`;
+        <tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Extern</th><th>Zählt als</th><th></th></tr>`;
     Object.keys(plan[art]).forEach(k => {
       const row = plan[art][k];
       html += planEditorRow(art, k, row);
@@ -2038,14 +2041,17 @@ async function renderPlan() {
 
 function planEditorRow(art, klasse, row) {
   const checked = row && row.enabled !== false ? "checked" : "";
-  const planVal = row ? (row.plan || 0) : 0;
+  const planVal = row ? (row.plan   || 0) : 0;
+  const extVal  = row ? (row.extern || 0) : 0;
   const matches = row ? (row.matches || "") : "";
   return `<tr data-art="${esc(art)}">
     <td><input type="checkbox" ${checked} class="pe-en"></td>
     <td><input type="text" class="pe-k"  value="${esc(klasse)}" style="width:110px;padding:4px;"></td>
     <td><input type="number" class="pe-p" min="0" value="${planVal}" style="width:60px;padding:4px;"></td>
+    <td><input type="number" class="pe-x" min="0" value="${extVal}"  style="width:60px;padding:4px;"
+         title="Extern erlegte Tiere (werden vom Plan abgezogen, aber nicht als Ist gezählt)"></td>
     <td><input type="text" class="pe-m" value="${esc(matches)}"
-         placeholder="z.B. T-Hirsch,J-Hirsch" style="width:180px;padding:4px;"
+         placeholder="z.B. T-Hirsch,J-Hirsch" style="width:160px;padding:4px;"
          title="Mehrere Wild-Klassen mit Komma trennen, z.B. T-Hirsch,J-Hirsch"></td>
     <td><button class="sm" style="background:#c62828;padding:2px 6px;" onclick="this.closest('tr').remove()">✕</button></td>
   </tr>`;
@@ -2089,6 +2095,7 @@ async function savePlan() {
     if (!kls) return;  // leere Zeilen ignorieren
     const cfg = {
       plan:    parseInt(tr.querySelector(".pe-p").value, 10) || 0,
+      extern:  parseInt(tr.querySelector(".pe-x").value, 10) || 0,
       enabled: tr.querySelector(".pe-en").checked,
       matches: tr.querySelector(".pe-m").value.trim(),
     };

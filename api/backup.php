@@ -77,7 +77,7 @@ if ($method === 'POST') {
 
         // Plan wieder einspielen
         if (!empty($in['abschussplan']) && is_array($in['abschussplan'])) {
-            $pCols = ['jahr','kontext','wildart','klasse','plan_anzahl','enabled','matches','sort_order'];
+            $pCols = ['jahr','kontext','wildart','klasse','plan_anzahl','extern','enabled','matches','sort_order'];
             $pSql  = 'INSERT INTO abschussplan (' . implode(',', $pCols) . ') VALUES (:'
                    . implode(', :', $pCols) . ')';
             $pStmt = $pdo->prepare($pSql);

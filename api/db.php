@@ -146,6 +146,7 @@ function ensureSchema(): void {
           wildart     VARCHAR(50) NOT NULL,
           klasse      VARCHAR(50) NOT NULL,
           plan_anzahl INT NOT NULL DEFAULT 0,
+          extern      INT NOT NULL DEFAULT 0,
           enabled     TINYINT(1) NOT NULL DEFAULT 1,
           matches     VARCHAR(255) NULL,
           sort_order  INT NOT NULL DEFAULT 0,
@@ -161,6 +162,8 @@ function ensureSchema(): void {
     try { $pdo->exec("ALTER TABLE abschussplan ADD COLUMN sort_order INT NOT NULL DEFAULT 0"); }
     catch (PDOException $e) { /* exists */ }
     try { $pdo->exec("ALTER TABLE abschussplan ADD COLUMN kontext VARCHAR(10) NOT NULL DEFAULT 'revier'"); }
+    catch (PDOException $e) { /* exists */ }
+    try { $pdo->exec("ALTER TABLE abschussplan ADD COLUMN extern INT NOT NULL DEFAULT 0"); }
     catch (PDOException $e) { /* exists */ }
     // Primary Key erweitern um kontext (atomar via MySQL)
     try { $pdo->exec("ALTER TABLE abschussplan DROP PRIMARY KEY, ADD PRIMARY KEY (jahr, kontext, wildart, klasse)"); }
