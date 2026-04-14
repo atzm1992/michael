@@ -1411,13 +1411,24 @@ function matchesSearch(d, q) {
   return hay.includes(q);
 }
 function getFiltered() {
-  return daten.filter(d =>
+  const list = daten.filter(d =>
     d.datum &&
     new Date(d.datum).getFullYear() === selectedYear &&
     (!statsFilter || (d.wildart || "Andere") === statsFilter) &&
     matchesSearch(d, sucheText)
   );
+  // Chronologisch: neueste zuerst, bei gleichem Datum nach Schusszeit,
+  // bei gleicher Zeit nach id (Tie-Breaker).
+  list.sort((a, b) => {
+    const da = (b.datum || '').localeCompare(a.datum || '');
+    if (da !== 0) return da;
+    const ta = (b.zeit || '').localeCompare(a.zeit || '');
+    if (ta !== 0) return ta;
+    return (Number(b.id) || 0) - (Number(a.id) || 0);
+  });
+  return list;
 }
+
 function setStatsFilter(wildart) {
   // Toggle: nochmal auf die gleiche Kachel klicken hebt den Filter auf
   statsFilter = (statsFilter === wildart) ? "" : wildart;
@@ -2200,10 +2211,48 @@ function ensureLeaflet() {
     zoomControl: true,
     attributionControl: true,
   });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+
+  // Zwei Tile-Schichten: Straßenkarte (OSM) und Satellit (Esri World Imagery)
+  const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap-Mitwirkende'
-  }).addTo(leafletMap);
+  });
+  const satLayer = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {
+      maxZoom: 19,
+      attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics'
+    }
+  );
+  // Zusätzlich: Labels-Overlay, das über dem Satellit Ortsnamen zeigt
+  const labelsLayer = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 19, pane: 'overlayPane' }
+  );
+
+  // Default: Satellit mit Beschriftung (besser für Jagdgelände)
+  satLayer.addTo(leafletMap);
+  labelsLayer.addTo(leafletMap);
+
+  // Layer-Switcher oben rechts
+  L.control.layers(
+    {
+      "🛰 Satellit": satLayer,
+      "🗺 Straßenkarte": osmLayer,
+    },
+    { "Beschriftung": labelsLayer },
+    { position: 'topright', collapsed: true }
+  ).addTo(leafletMap);
+
+  // Wenn auf OSM umgeschaltet wird, Labels-Overlay ausblenden
+  // (OSM hat die Beschriftung schon eingebacken).
+  leafletMap.on('baselayerchange', ev => {
+    if (ev.layer === osmLayer) {
+      if (leafletMap.hasLayer(labelsLayer)) leafletMap.removeLayer(labelsLayer);
+    } else {
+      if (!leafletMap.hasLayer(labelsLayer)) labelsLayer.addTo(leafletMap);
+    }
+  });
 
   leafletEntryLayer = L.layerGroup().addTo(leafletMap);
 
