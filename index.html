@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Abschussliste Jagdverein Prad</title>
+<title>Abschussliste Jagdrevier Prad</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2e7d32">
 
@@ -360,8 +360,8 @@ tr:hover { background: var(--gruen-l); }
 <div id="start" class="page active">
   <div class="header">
     <img src="logo.jpg"
-         alt="Jagdverein Prad" onerror="this.style.display='none'" id="logoImg">
-    <h2>Abschussliste<br>Jagdverein Prad</h2>
+         alt="Jagdrevier Prad" onerror="this.style.display='none'" id="logoImg">
+    <h2>Abschussliste<br>Jagdrevier Prad</h2>
     <div class="code">Zahlencode: 1024</div>
   </div>
   <div class="topbar">
@@ -382,7 +382,7 @@ tr:hover { background: var(--gruen-l); }
   <div class="header">
     <img src="491438944_10226782024328158_4391837002889702168_n.jpg"
          alt="" style="width:60px;" onerror="this.style.display='none'">
-    <h2 id="revierTitle">Jagdverein Prad</h2>
+    <h2 id="revierTitle">Jagdrevier Prad</h2>
     <div id="adminIndicator" style="display:none;">
       <span class="admin-badge">ADMIN</span>
       <span style="font-size:11px;color:var(--grau);cursor:pointer;margin-left:6px;" onclick="adminLogout()">abmelden</span>
@@ -537,7 +537,7 @@ tr:hover { background: var(--gruen-l); }
     <h4>Allgemein</h4>
     <div class="admin-row">
       <label>Reviername:</label>
-      <input id="cfgRevier" value="Jagdverein Prad">
+      <input id="cfgRevier" value="Jagdrevier Prad">
     </div>
     <div class="admin-row">
       <label>Zahlencode:</label>
@@ -635,7 +635,12 @@ tr:hover { background: var(--gruen-l); }
 
 /* ---------- Kosmetische Client-Konfiguration (bleibt lokal) ---------- */
 let config = JSON.parse(localStorage.getItem("cfg") || '{}');
-if (!config.revier) config.revier = "Jagdverein Prad";
+// One-time-Migration: alter Name "Jagdverein Prad" → "Jagdrevier Prad"
+if (config.revier === "Jagdverein Prad") {
+  config.revier = "Jagdrevier Prad";
+  localStorage.setItem("cfg", JSON.stringify(config));
+}
+if (!config.revier) config.revier = "Jagdrevier Prad";
 if (!config.code) config.code = "1024";
 if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
 
@@ -1680,7 +1685,7 @@ async function adminLogoutFull() {
 }
 
 function saveConfig() {
-  config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdverein Prad";
+  config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdrevier Prad";
   config.code = document.getElementById("cfgCode").value.trim() || "1024";
   config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
   saveCfg(); applyConfig();

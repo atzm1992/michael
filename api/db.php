@@ -73,7 +73,7 @@ function db(): PDO {
             // Der Fehler wird absichtlich NICHT an den Browser zurückgegeben.
             // Für Debug: in PHP-Error-Log schreiben und einen generischen
             // Fehler liefern.
-            error_log('[jagdverein] DB connect failed: ' . $ex->getMessage());
+            error_log('[jagdrevier] DB connect failed: ' . $ex->getMessage());
             http_response_code(500);
             echo json_encode([
                 'ok'    => false,
