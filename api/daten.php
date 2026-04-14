@@ -62,9 +62,12 @@ if ($method === 'GET') {
     jsonOk($s->fetchAll());
 }
 
-/* ================= POST ================= */
+/* ================= POST =================
+   Neue Einträge und die Teilaktionen Entnahme/Abfall dürfen alle
+   Jäger ohne Login ausführen (wie in der alten App). Nur die
+   Aktion 'gemeldet' bleibt Admin-only.
+*/
 if ($method === 'POST') {
-    requireLogin();
     $in = jsonInput();
     $action = $in['action'] ?? '';
 
@@ -130,22 +133,19 @@ if ($method === 'POST') {
     jsonOk(loadEntry($pdo, $newId));
 }
 
-/* ================= PUT ================= */
+/* ================= PUT =================
+   Der Edit-Dialog in der Oberfläche wird nur Admins gezeigt, also
+   setzen wir serverseitig requireAdmin().
+*/
 if ($method === 'PUT') {
-    requireLogin();
+    requireAdmin();
     $id = (int) ($_GET['id'] ?? 0);
     if ($id <= 0) jsonErr('id fehlt');
     $entry = loadEntry($pdo, $id);
     if (!$entry) jsonErr('Eintrag nicht gefunden', 404);
 
-    if (entryIsLocked($entry) && !isAdmin()) {
-        jsonErr('Eintrag ist als gemeldet gesperrt', 403);
-    }
-
     $in = jsonInput();
     $data = fromRequest($in, $ALLOWED);
-    // Normalo darf Gemeldet-Flag nicht ändern
-    if (!isAdmin()) unset($data['gemeldet']);
     if (isset($data['gemeldet'])) {
         $data['gemeldet'] = !empty($data['gemeldet']) ? 1 : 0;
     }

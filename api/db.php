@@ -70,13 +70,14 @@ function db(): PDO {
                 PDO::ATTR_EMULATE_PREPARES   => false,
             ]);
         } catch (PDOException $ex) {
+            // Der Fehler wird absichtlich NICHT an den Browser zurückgegeben.
+            // Für Debug: in PHP-Error-Log schreiben und einen generischen
+            // Fehler liefern.
+            error_log('[jagdverein] DB connect failed: ' . $ex->getMessage());
             http_response_code(500);
             echo json_encode([
                 'ok'    => false,
-                'error' => 'DB-Verbindung fehlgeschlagen: ' . $ex->getMessage()
-                         . ' | host=' . $CONFIG['db_host']
-                         . ' db='     . $CONFIG['db_name']
-                         . ' user='   . $CONFIG['db_user'],
+                'error' => 'DB-Verbindung fehlgeschlagen',
             ]);
             exit;
         }
