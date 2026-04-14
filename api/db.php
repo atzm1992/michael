@@ -131,9 +131,20 @@ function ensureSchema(): void {
           wildart     VARCHAR(50) NOT NULL,
           klasse      VARCHAR(50) NOT NULL,
           plan_anzahl INT NOT NULL DEFAULT 0,
+          enabled     TINYINT(1) NOT NULL DEFAULT 1,
+          matches     VARCHAR(255) NULL,
+          sort_order  INT NOT NULL DEFAULT 0,
           PRIMARY KEY (jahr, wildart, klasse)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    // Migration: Spalten zu bestehender Tabelle hinzufügen
+    try { $pdo->exec("ALTER TABLE abschussplan ADD COLUMN enabled TINYINT(1) NOT NULL DEFAULT 1"); }
+    catch (PDOException $e) { /* exists */ }
+    try { $pdo->exec("ALTER TABLE abschussplan ADD COLUMN matches VARCHAR(255) NULL"); }
+    catch (PDOException $e) { /* exists */ }
+    try { $pdo->exec("ALTER TABLE abschussplan ADD COLUMN sort_order INT NOT NULL DEFAULT 0"); }
+    catch (PDOException $e) { /* exists */ }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS config (
           k VARCHAR(50) PRIMARY KEY,

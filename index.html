@@ -402,6 +402,20 @@ tr:hover { background: var(--gruen-l); }
 .plan-ist tr.sum td { background: var(--gruen-l); font-weight: bold; }
 .plan-ist tr.over td { color: var(--rot); font-weight: bold; }
 
+/* Plan-Editor (Admin) */
+.plan-group { margin: 12px 0; padding: 8px 10px; background: #f7f7f7; border-radius: 6px; }
+.plan-group h5 {
+  margin: 0 0 6px; color: var(--gruen-d);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 14px;
+}
+.plan-edit { width: 100%; border-collapse: collapse; font-size: 12px; }
+.plan-edit th, .plan-edit td { padding: 3px 4px; border-bottom: 1px solid #e0e0e0; text-align: left; }
+.plan-edit th { background: var(--gruen); color: #fff; text-align: left; font-weight: 600; }
+.plan-edit input[type="number"],
+.plan-edit input[type="text"] { margin: 0; padding: 4px 6px; }
+.plan-edit input[type="checkbox"] { width: 18px; height: 18px; }
+
 /* Meldeliste im Admin */
 .meld-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .meld-table td {
@@ -967,16 +981,42 @@ async function ensurePlan(year) {
   if (abschussplan[year]) return abschussplan[year];
   try {
     const res = await api.getPlan(year);
-    abschussplan[year] = res.plan || {};
+    abschussplan[year] = normalizePlan(res.plan || {});
   } catch (err) {
-    // Bei Fehler: leeren Plan zurückgeben, damit die Anzeige nicht bricht
-    abschussplan[year] = {};
-    Object.keys(PLAN_KLASSEN).forEach(art => {
-      abschussplan[year][art] = {};
-      PLAN_KLASSEN[art].forEach(k => { abschussplan[year][art][k] = 0; });
-    });
+    abschussplan[year] = normalizePlan({});
   }
   return abschussplan[year];
+}
+
+/* Einheitliches Plan-Format: { Wildart: { Klasse: { plan, enabled, matches } } }
+   Nimmt sowohl altes Integer-Format als auch neues Objekt-Format entgegen
+   und füllt fehlende Default-Klassen auf. */
+function normalizePlan(raw) {
+  const out = {};
+  // Zuerst die Default-Struktur aufbauen
+  Object.keys(PLAN_KLASSEN).forEach(art => {
+    out[art] = {};
+    PLAN_KLASSEN[art].forEach(k => {
+      out[art][k] = { plan: 0, enabled: true, matches: "" };
+    });
+  });
+  // Werte aus raw übernehmen (auch custom Wildarten/Klassen)
+  Object.keys(raw || {}).forEach(art => {
+    if (!out[art]) out[art] = {};
+    Object.keys(raw[art] || {}).forEach(k => {
+      const v = raw[art][k];
+      if (typeof v === "number") {
+        out[art][k] = { plan: v, enabled: true, matches: "" };
+      } else if (v && typeof v === "object") {
+        out[art][k] = {
+          plan:    parseInt(v.plan, 10) || 0,
+          enabled: v.enabled !== false,
+          matches: (v.matches || "").toString(),
+        };
+      }
+    });
+  });
+  return out;
 }
 
 /* Klassen-Struktur für den Abschussplan */
@@ -990,12 +1030,7 @@ const PLAN_KLASSEN = {
    aufgerufen haben, sonst kommt ein leerer Default-Plan zurück. */
 function getPlan(year) {
   if (abschussplan[year]) return abschussplan[year];
-  const empty = {};
-  Object.keys(PLAN_KLASSEN).forEach(art => {
-    empty[art] = {};
-    PLAN_KLASSEN[art].forEach(k => { empty[art][k] = 0; });
-  });
-  return empty;
+  return normalizePlan({});
 }
 
 /* ---------- Init ---------- */
@@ -1184,31 +1219,44 @@ function closePlanPopup() {
 function renderPlanIstTabelle(fd, year) {
   const plan = getPlan(year);
 
-  // Ist-Werte zählen (pro Wildart & Klasse)
-  const ist = {};
-  Object.keys(PLAN_KLASSEN).forEach(art => {
-    ist[art] = {};
-    PLAN_KLASSEN[art].forEach(k => { ist[art][k] = 0; });
-  });
+  // Pro Wildart Ist-Werte pro Wild-Klasse grob vorzählen
+  const raw = {};
   fd.forEach(d => {
-    if (PLAN_KLASSEN[d.wildart] && PLAN_KLASSEN[d.wildart].includes(d.wild)) {
-      ist[d.wildart][d.wild]++;
-    }
+    const a = d.wildart || "";
+    if (!raw[a]) raw[a] = {};
+    const k = d.wild || "–";
+    raw[a][k] = (raw[a][k] || 0) + 1;
   });
 
+  // Für jede Plan-Zeile den Ist-Wert berechnen.
+  // matches ist optional eine kommagetrennte Liste; wenn gesetzt,
+  // werden alle dort aufgeführten Wild-Klassen zusammengezählt.
+  function istFor(art, klasse, matches) {
+    const bucket = raw[art] || {};
+    const keys = matches && matches.trim()
+      ? matches.split(",").map(s => s.trim()).filter(Boolean)
+      : [klasse];
+    let sum = 0;
+    keys.forEach(k => { sum += (bucket[k] || 0); });
+    return sum;
+  }
+
   let html = '<div class="plan-ist-wrap"><h4>Abschussplan ' + year + '</h4>';
-  Object.keys(PLAN_KLASSEN).forEach(art => {
+  Object.keys(plan).forEach(art => {
+    const rows = Object.keys(plan[art]).filter(k => plan[art][k].enabled);
+    if (!rows.length) return;
     html += `<table class="plan-ist">
-      <tr><th colspan="4">${art}</th></tr>
+      <tr><th colspan="4">${esc(art)}</th></tr>
       <tr><th>Klasse</th><th>Plan</th><th>Ist</th><th>Rest</th></tr>`;
     let sP = 0, sI = 0;
-    PLAN_KLASSEN[art].forEach(k => {
-      const p = plan[art][k] || 0;
-      const iv = ist[art][k] || 0;
+    rows.forEach(k => {
+      const row = plan[art][k];
+      const p   = row.plan || 0;
+      const iv  = istFor(art, k, row.matches);
       const rest = p - iv;
       sP += p; sI += iv;
       const cls = (rest < 0) ? ' class="over"' : '';
-      html += `<tr${cls}><td>${k}</td><td>${p}</td><td>${iv}</td><td>${rest}</td></tr>`;
+      html += `<tr${cls}><td>${esc(k)}</td><td>${p}</td><td>${iv}</td><td>${rest}</td></tr>`;
     });
     html += `<tr class="sum"><td>Summe</td><td>${sP}</td><td>${sI}</td><td>${sP - sI}</td></tr></table>`;
   });
@@ -1237,39 +1285,89 @@ async function renderPlan() {
   const y = parseInt(document.getElementById("planYear").value, 10);
   await ensurePlan(y);
   const plan = getPlan(y);
-  let html = '<table class="plan-ist">';
-  Object.keys(PLAN_KLASSEN).forEach(art => {
-    html += `<tr><th colspan="2">${art}</th></tr>`;
-    PLAN_KLASSEN[art].forEach(k => {
-      const v = (plan[art] && plan[art][k]) || 0;
-      html += `<tr>
-        <td style="text-align:left;">${k}</td>
-        <td><input type="number" min="0" value="${v}"
-             data-art="${art}" data-klasse="${k}" style="width:70px;padding:4px;"></td>
-      </tr>`;
+
+  let html = '<p class="hint">Hake ab, welche Klassen gezählt werden sollen. '
+           + 'Über „Zählt als" kannst du eine Zeile definieren, die mehrere '
+           + 'Wild-Klassen zusammenfasst (z.B. „T-Hirsch,J-Hirsch" für männliches Rotwild).</p>';
+
+  Object.keys(plan).forEach(art => {
+    html += `<div class="plan-group">
+      <h5>${esc(art)} <button class="sm sec" onclick="planAddRow(this,'${esc(art)}')">+ Klasse</button></h5>
+      <table class="plan-edit">
+        <tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Zählt als (optional)</th><th></th></tr>`;
+    Object.keys(plan[art]).forEach(k => {
+      const row = plan[art][k];
+      html += planEditorRow(art, k, row);
     });
+    html += `</table></div>`;
   });
-  html += '</table>';
+
+  html += `<div style="margin-top:8px;">
+    <button class="sm sec" onclick="planAddGroup()">+ neue Wildart</button>
+  </div>`;
+
   document.getElementById("planEditor").innerHTML = html;
+}
+
+function planEditorRow(art, klasse, row) {
+  const checked = row && row.enabled !== false ? "checked" : "";
+  const planVal = row ? (row.plan || 0) : 0;
+  const matches = row ? (row.matches || "") : "";
+  return `<tr data-art="${esc(art)}">
+    <td><input type="checkbox" ${checked} class="pe-en"></td>
+    <td><input type="text" class="pe-k"  value="${esc(klasse)}" style="width:110px;padding:4px;"></td>
+    <td><input type="number" class="pe-p" min="0" value="${planVal}" style="width:60px;padding:4px;"></td>
+    <td><input type="text" class="pe-m" value="${esc(matches)}" placeholder="leer = nur sich selbst" style="width:180px;padding:4px;"></td>
+    <td><button class="sm" style="background:#c62828;padding:2px 6px;" onclick="this.closest('tr').remove()">✕</button></td>
+  </tr>`;
+}
+
+function planAddRow(btn, art) {
+  const group = btn.closest('.plan-group');
+  const table = group.querySelector('table');
+  const tr = document.createElement('tr');
+  tr.dataset.art = art;
+  tr.innerHTML = planEditorRow(art, "", { plan: 0, enabled: true, matches: "" })
+    .replace(/^<tr[^>]*>|<\/tr>$/g, '');
+  table.appendChild(tr);
+  tr.querySelector('.pe-k').focus();
+}
+
+function planAddGroup() {
+  const name = (prompt("Name der neuen Wildart (z.B. 'Schwarzwild'):") || "").trim();
+  if (!name) return;
+  const editor = document.getElementById("planEditor");
+  const div = document.createElement('div');
+  div.className = 'plan-group';
+  div.innerHTML = `
+    <h5>${esc(name)} <button class="sm sec" onclick="planAddRow(this,'${esc(name)}')">+ Klasse</button></h5>
+    <table class="plan-edit">
+      <tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Zählt als (optional)</th><th></th></tr>
+    </table>`;
+  editor.appendChild(div);
 }
 
 async function savePlan() {
   const y = parseInt(document.getElementById("planYear").value, 10);
-  // frisches Plan-Objekt aus den Input-Feldern bauen
+  // Plan aus den Feldern rekonstruieren. Die Wildart steht pro Zeile in
+  // data-art, der Klassenname ist das <input.pe-k>-Feld (damit man Klassen
+  // umbenennen oder neu anlegen kann).
   const plan = {};
-  Object.keys(PLAN_KLASSEN).forEach(art => {
-    plan[art] = {};
-    PLAN_KLASSEN[art].forEach(k => { plan[art][k] = 0; });
-  });
-  document.querySelectorAll("#planEditor input").forEach(inp => {
-    const art = inp.dataset.art;
-    const k   = inp.dataset.klasse;
+  document.querySelectorAll("#planEditor tr[data-art]").forEach(tr => {
+    const art = tr.dataset.art;
+    const kls = tr.querySelector(".pe-k").value.trim();
+    if (!kls) return;  // leere Zeilen ignorieren
+    const cfg = {
+      plan:    parseInt(tr.querySelector(".pe-p").value, 10) || 0,
+      enabled: tr.querySelector(".pe-en").checked,
+      matches: tr.querySelector(".pe-m").value.trim(),
+    };
     if (!plan[art]) plan[art] = {};
-    plan[art][k] = parseInt(inp.value, 10) || 0;
+    plan[art][kls] = cfg;
   });
   try {
     await api.savePlan(y, plan);
-    abschussplan[y] = plan;           // Cache aktualisieren
+    abschussplan[y] = normalizePlan(plan);
     anzeigen();
     alert("Abschussplan gespeichert.");
   } catch (err) {
@@ -1319,14 +1417,25 @@ function renderMeldListe() {
 
 async function toggleGemeldet(id) {
   const d = daten.find(x => x.id === id);
-  if (!d) return;
+  if (!d) { alert("Eintrag #" + id + " nicht gefunden."); return; }
   try {
-    const row = await api.eintragAction(id, 'gemeldet', !d.gemeldet);
+    // Server erwartet truthy/falsy; explizit als 1/0 schicken, damit
+    // es unabhängig vom Wahrheitswert eindeutig ist.
+    const neu = d.gemeldet ? 0 : 1;
+    const row = await api.eintragAction(id, 'gemeldet', neu);
     applyRow(row);
     renderMeldListe();
     anzeigen();
   } catch (err) {
-    alert("Speichern fehlgeschlagen: " + err.message);
+    if (String(err.message).includes('Nicht eingeloggt') ||
+        String(err.message).includes('Nur für Admin')) {
+      alert("Admin-Session abgelaufen. Bitte oben rechts neu einloggen.");
+      isAdmin = false;
+      applyConfig();
+      zeigeSeite('admin-login');
+    } else {
+      alert("Speichern fehlgeschlagen: " + err.message);
+    }
   }
 }
 
@@ -1447,7 +1556,15 @@ function showSummary() {
 }
 
 function editFromSummary() {
-  document.getElementById("inputName").value = e.name||"";
+  // Alle Workflow-Felder aus dem aktuellen Eintrag vorausfüllen,
+  // damit der User wirklich editieren und nicht neu anfangen muss.
+  document.getElementById("inputName").value   = e.name   || "";
+  document.getElementById("andereInput").value = "";
+  document.getElementById("inputGewicht").value = (e.gewicht != null ? e.gewicht : "");
+  document.getElementById("inputOrt").value    = (e.ort && e.ort !== "Prad") ? e.ort : "";
+  document.getElementById("inputZeit").value   = e.zeit   || "";
+  document.getElementById("inputDatum").value  = e.datum  || "";
+  document.getElementById("andereOrtBox").style.display = "none";
   zeigeSeite("wf-name");
 }
 
@@ -1696,7 +1813,7 @@ function anzeigen() {
     r.insertCell().innerText = d.gewicht||"";
 
     const oc = r.insertCell();
-    if (d.ort==="Prad" && d.latlng) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>`;
+    if (d.latlng) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`;
     else oc.innerText = d.ort||"";
 
     r.insertCell().innerText = d.zeit||"";
@@ -1736,7 +1853,9 @@ function anzeigen() {
     const card = document.createElement("div");
     card.className = "card" + (d.gemeldet ? " card-gemeldet" : "");
     const wt = (d.gemeldet ? "🔒 " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
-    const ortH = (d.ort==="Prad"&&d.latlng) ? `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>` : esc(d.ort||"");
+    const ortH = d.latlng
+      ? `<span class="link" onclick="openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`
+      : esc(d.ort||"");
 
     let entH = !d.entnommen
       ? `<span class="tag-btn tag-ent" onclick="pickDate(${ri})">+ Entnahme</span><input type="date" id="mdt${ri}" style="display:none;" onchange="setEntnommen(${ri},this.value)">`
@@ -1809,9 +1928,13 @@ async function setEntnommen(id, val) {
 
 function handleAbfall(id) {
   if (istGesperrt(id)) return alertGesperrt();
-  const ov = document.createElement("div"); ov.className="popup-overlay";
+  const ov = document.createElement("div");
+  ov.className = "popup-overlay";
+  ov.style.cssText = "display:block;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;";
+  const box = document.createElement("div");
+  box.className = "popup";
+  box.style.cssText = "display:block;z-index:1000;";
   ov.onclick = () => { ov.remove(); box.remove(); };
-  const box = document.createElement("div"); box.className="popup";
   box.innerHTML = `<h3>Abfall</h3>
     <p style="margin:10px 0;">${esc(config.abfallText)}</p>
     <button onclick="setAbfall(${id},'ja')">✅ Ja</button>
@@ -1859,14 +1982,18 @@ async function loeschen(id) {
    ADMIN: EINTRAG BEARBEITEN
    ============================================================ */
 function openEdit(id) {
-  if (!isAdmin) return;
+  if (!isAdmin) { alert("Nur der Admin kann Einträge bearbeiten."); return; }
   const d = daten.find(x => x.id === id);
-  if (!d) return;
+  if (!d) { alert("Eintrag #" + id + " nicht gefunden."); return; }
   const abfV = (d.abfall == null) ? "" : d.abfall;
 
-  const ov = document.createElement("div"); ov.className="popup-overlay";
+  const ov = document.createElement("div");
+  ov.className = "popup-overlay";
+  ov.style.cssText = "display:block;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;";
+  const box = document.createElement("div");
+  box.className = "popup";
+  box.style.cssText = "display:block;z-index:1000;";
   ov.onclick = () => { ov.remove(); box.remove(); };
-  const box = document.createElement("div"); box.className="popup";
   box.innerHTML = `
     <h3>✏️ Eintrag bearbeiten</h3>
     <div class="edit-row"><label>Erleger</label><input id="ed_name" value="${esc(d.name||"")}"></div>
