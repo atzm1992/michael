@@ -1,0 +1,21 @@
+# Schutz für Konfiguration: config.php darf nicht direkt aus dem
+# Browser gelesen werden, auch wenn sie durch einen PHP-Fehler
+# geparst statt ausgeführt würde.
+<FilesMatch "^config\.php$">
+    Require all denied
+</FilesMatch>
+
+# Fallback für ältere Apache-Versionen
+<IfModule !mod_authz_core.c>
+    <FilesMatch "^config\.php$">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>
+
+# JSON-Endpoints sollen nicht gecacht werden
+<IfModule mod_headers.c>
+    <FilesMatch "\.php$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
