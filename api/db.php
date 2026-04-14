@@ -116,6 +116,7 @@ function ensureSchema(): void {
           entnommen   DATE NULL,
           abfall      VARCHAR(10) NULL,
           gemeldet    TINYINT(1) NOT NULL DEFAULT 0,
+          ist_park    TINYINT(1) NOT NULL DEFAULT 0,
           jahr        INT GENERATED ALWAYS AS (YEAR(datum)) STORED,
           created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -131,16 +132,20 @@ function ensureSchema(): void {
     catch (PDOException $e) { /* column existiert bereits */ }
     try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN wetter VARCHAR(120) NULL AFTER koord_lng"); }
     catch (PDOException $e) { /* column existiert bereits */ }
+    // Park-Feature: unterscheidet Revier- und Park-Einträge
+    try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN ist_park TINYINT(1) NOT NULL DEFAULT 0"); }
+    catch (PDOException $e) { /* column existiert bereits */ }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS abschussplan (
           jahr        INT NOT NULL,
+          kontext     VARCHAR(10) NOT NULL DEFAULT 'revier',
           wildart     VARCHAR(50) NOT NULL,
           klasse      VARCHAR(50) NOT NULL,
           plan_anzahl INT NOT NULL DEFAULT 0,
           enabled     TINYINT(1) NOT NULL DEFAULT 1,
           matches     VARCHAR(255) NULL,
           sort_order  INT NOT NULL DEFAULT 0,
-          PRIMARY KEY (jahr, wildart, klasse)
+          PRIMARY KEY (jahr, kontext, wildart, klasse)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
@@ -151,6 +156,11 @@ function ensureSchema(): void {
     catch (PDOException $e) { /* exists */ }
     try { $pdo->exec("ALTER TABLE abschussplan ADD COLUMN sort_order INT NOT NULL DEFAULT 0"); }
     catch (PDOException $e) { /* exists */ }
+    try { $pdo->exec("ALTER TABLE abschussplan ADD COLUMN kontext VARCHAR(10) NOT NULL DEFAULT 'revier'"); }
+    catch (PDOException $e) { /* exists */ }
+    // Primary Key erweitern um kontext (atomar via MySQL)
+    try { $pdo->exec("ALTER TABLE abschussplan DROP PRIMARY KEY, ADD PRIMARY KEY (jahr, kontext, wildart, klasse)"); }
+    catch (PDOException $e) { /* PK bereits korrekt */ }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS config (
           k VARCHAR(50) PRIMARY KEY,

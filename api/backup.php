@@ -64,7 +64,7 @@ if ($method === 'POST') {
         // Einträge wieder einspielen
         $cols = ['id','name','wildart','wild','gewicht','ort',
                  'koord_x','koord_y','koord_lat','koord_lng','wetter',
-                 'zeit','datum','verwendung','entnommen','abfall','gemeldet'];
+                 'zeit','datum','verwendung','entnommen','abfall','gemeldet','ist_park'];
         $sql  = 'INSERT INTO eintraege (' . implode(',', $cols) . ') VALUES (:'
               . implode(', :', $cols) . ')';
         $stmt = $pdo->prepare($sql);
@@ -77,11 +77,13 @@ if ($method === 'POST') {
 
         // Plan wieder einspielen
         if (!empty($in['abschussplan']) && is_array($in['abschussplan'])) {
-            $pCols = ['jahr','wildart','klasse','plan_anzahl','enabled','matches','sort_order'];
+            $pCols = ['jahr','kontext','wildart','klasse','plan_anzahl','enabled','matches','sort_order'];
             $pSql  = 'INSERT INTO abschussplan (' . implode(',', $pCols) . ') VALUES (:'
                    . implode(', :', $pCols) . ')';
             $pStmt = $pdo->prepare($pSql);
             foreach ($in['abschussplan'] as $row) {
+                // Fallback für alte Backups ohne kontext -> 'revier'
+                if (!isset($row['kontext'])) $row['kontext'] = 'revier';
                 foreach ($pCols as $c) {
                     $pStmt->bindValue(':' . $c, $row[$c] ?? (($c === 'enabled' || $c === 'sort_order') ? 0 : null));
                 }
