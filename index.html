@@ -1850,19 +1850,38 @@ async function openPlanPopup() {
 /* Jahres-Balkendiagramm: Anzahl Einträge pro Monat, gestapelt nach Wildart */
 function renderMonthChart(entries, year) {
   const MONATE = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  // Bekannte Wildarten mit festen Farben (konsistent mit den Kartenmarkern).
   const FARBEN = {
-    "Rehwild":  "#FFD600",
-    "Rotwild":  "#E53935",
-    "Gamswild": "#424242",
-    "Fuchs":    "#FF6D00",
-    "Hase":     "#795548",
-    "Andere":   "#1E88E5",
+    "Rehwild":    "#FFD600",
+    "Rotwild":    "#E53935",
+    "Gamswild":   "#424242",
+    "Fuchs":      "#FF6D00",
+    "Hase":       "#795548",
+    "Schwarzwild":"#6D4C41",
+    "Murmeltier": "#00897B",
+    "Steinbock":  "#8BC34A",
+    "Fallwild":   "#9C27B0",   // Fallwild als eigene Kategorie
+    "Andere":     "#1E88E5",
   };
-  // Pro Monat pro Wildart zählen
+  // Fallback-Palette für unbekannte custom Wildarten -
+  // deterministisch aus dem Namen abgeleitet, damit gleiche Namen
+  // immer dieselbe Farbe bekommen.
+  const PALETTE = ["#00ACC1","#7CB342","#F9A825","#8E24AA","#5E35B1",
+                   "#FB8C00","#D81B60","#43A047","#3949AB","#E53935"];
+  function colorFor(art) {
+    if (FARBEN[art]) return FARBEN[art];
+    // Einfacher String-Hash, um den Namen auf einen Paletten-Index zu mappen
+    let hash = 0;
+    for (let i = 0; i < art.length; i++) hash = (hash * 31 + art.charCodeAt(i)) >>> 0;
+    return PALETTE[hash % PALETTE.length];
+  }
+
+  // Pro Monat pro Kategorie zählen. Fallwild ist eine eigene
+  // Kategorie, damit es im Chart unterscheidbar ist.
   const months = Array.from({length: 12}, () => ({}));
   entries.forEach(d => {
     const m = new Date(d.datum).getMonth();
-    const a = d.wildart || "Andere";
+    const a = d.ist_fallwild ? "Fallwild" : (d.wildart || "Andere");
     months[m][a] = (months[m][a] || 0) + 1;
   });
   const totals = months.map(m => Object.values(m).reduce((s,n) => s+n, 0));
@@ -1889,7 +1908,7 @@ function renderMonthChart(entries, year) {
     Object.keys(m).sort().forEach(art => {
       const h = (m[art] / maxTotal) * (H - padB);
       yStack -= h;
-      const col = FARBEN[art] || FARBEN["Andere"];
+      const col = colorFor(art);
       html += `<rect x="${x}" y="${yStack}" width="${barW - 4}" height="${h}" fill="${col}">
                  <title>${esc(art)}: ${m[art]}</title>
                </rect>`;
@@ -1902,12 +1921,14 @@ function renderMonthChart(entries, year) {
 
   html += '</svg>';
 
-  // Legende
+  // Legende zeigt alle tatsächlich vorkommenden Kategorien (inkl. Fallwild)
   const wildarten = new Set();
-  entries.forEach(d => wildarten.add(d.wildart || "Andere"));
+  entries.forEach(d => {
+    wildarten.add(d.ist_fallwild ? "Fallwild" : (d.wildart || "Andere"));
+  });
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin-top:4px;">';
   [...wildarten].sort().forEach(a => {
-    const col = FARBEN[a] || FARBEN["Andere"];
+    const col = colorFor(a);
     html += `<span style="display:inline-flex;align-items:center;gap:4px;">
                <i style="display:inline-block;width:10px;height:10px;background:${col};border-radius:2px;"></i>${esc(a)}
              </span>`;
@@ -3118,10 +3139,18 @@ function bnMore() {
   const close = () => { ov.remove(); box.remove(); };
   ov.onclick = close;
   box.onclick = ev => ev.stopPropagation();
+
+  // Karte und Plan brauchen einen Modus (Revier oder Park).
+  // Wir zeigen sie nur, wenn der User bereits in der Revier-Liste ist.
+  const currentPage = document.querySelector(".page.active");
+  const inRevier = currentPage && currentPage.id === "revier";
+
   const items = [];
-  items.push({ icon: "🗺", label: "Karte", action: () => { close(); openMapAll(); } });
-  if (config.planVisible !== false || isAdmin) {
-    items.push({ icon: "📋", label: "Plan", action: () => { close(); openPlanPopup(); } });
+  if (inRevier) {
+    items.push({ icon: "🗺", label: "Karte", action: () => { close(); openMapAll(); } });
+    if (config.planVisible !== false || isAdmin) {
+      items.push({ icon: "📋", label: "Plan", action: () => { close(); openPlanPopup(); } });
+    }
   }
   items.push({ icon: "❓", label: "Hilfe", action: () => { close(); openHelp(); } });
   if (isAdmin) {
