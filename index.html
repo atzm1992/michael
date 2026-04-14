@@ -269,10 +269,64 @@ tr:hover { background: var(--gruen-l); }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
   gap: 4px;
+  cursor: pointer;
+  user-select: none;
 }
 .card-head strong { font-size: 15px; color: var(--gruen-d); }
+
+/* Kompakte Kopfzeile */
+.card-compact-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 13px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.card-compact-line strong {
+  font-size: 14px;
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-compact-wild {
+  color: var(--grau);
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-compact-date {
+  font-size: 11px;
+  color: var(--grau);
+  flex-shrink: 0;
+}
+.card-expand-chevron {
+  font-size: 10px;
+  color: var(--grau);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.card.expanded .card-expand-chevron { transform: rotate(180deg); }
+
+/* Body ist standardmäßig offen; im compact-Modus eingeklappt,
+   außer wenn die Karte manuell expanded ist */
+.card-body { margin-top: 8px; }
+.card.card-compact .card-body { display: none; }
+.card.card-compact.expanded .card-body { display: block; }
+.card.card-compact { padding: 8px 10px; margin-bottom: 5px; }
+.card.card-compact .card-head { margin-bottom: 0; }
+
+.card-head-admin {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 6px;
+}
 .card-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -361,47 +415,6 @@ tr:hover { background: var(--gruen-l); }
 }
 
 .hint { font-size: 12px; color: #555; margin: 6px 0; }
-
-/* Workflow-Fortschritt (fix oben, zwischen Admin-FAB und Container) */
-.wf-progress {
-  position: sticky;
-  top: 0;
-  z-index: 800;
-  background: rgba(255,255,255,0.95);
-  padding: 8px 12px 6px;
-  margin: -10px -10px 10px;  /* in den Container-Rand hinein */
-  border-bottom: 1px solid #e0e0e0;
-  backdrop-filter: blur(6px);
-}
-.wf-progress-bar {
-  height: 6px;
-  background: #e0e0e0;
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-.wf-progress-fill {
-  height: 100%;
-  background: var(--gruen);
-  transition: width 0.2s ease;
-  width: 0;
-}
-.wf-progress-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  color: var(--grau);
-}
-.wf-cancel {
-  background: transparent !important;
-  color: var(--rot) !important;
-  padding: 2px 8px;
-  font-size: 12px;
-  margin: 0;
-  border: 1px solid var(--rot);
-  border-radius: 6px;
-}
 
 /* Toast-Benachrichtigungen */
 .toast-box {
@@ -566,15 +579,6 @@ tr:hover { background: var(--gruen-l); }
 <!-- Toast-Container für Erfolgsmeldungen -->
 <div id="toastBox" class="toast-box"></div>
 
-<!-- Workflow-Progressbar (wird bei wf-* Seiten eingeblendet) -->
-<div id="wfProgress" class="wf-progress" style="display:none;">
-  <div class="wf-progress-bar"><div class="wf-progress-fill" id="wfProgressFill"></div></div>
-  <div class="wf-progress-row">
-    <span class="wf-progress-text" id="wfProgressText">Schritt 1 von 8</span>
-    <button class="wf-cancel" onclick="workflowAbort()" title="Eintrag abbrechen">✕ Abbrechen</button>
-  </div>
-</div>
-
 <div class="container">
 
 <!-- STARTSEITE -->
@@ -633,7 +637,7 @@ tr:hover { background: var(--gruen-l); }
   <input id="inputName" autocomplete="off" placeholder="Name eingeben...">
   <div id="nameSuggestions" style="margin:4px 0;"></div>
   <button onclick="nextWild()">Weiter ➡</button>
-  <button class="sec" onclick="zeigeSeite('revier')">⬅ Abbrechen</button>
+  <button class="sec" onclick="workflowAbort()">✕ Abbrechen</button>
 </div>
 
 <div id="wf-wild" class="page">
@@ -647,6 +651,7 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="zeigeSeite('wf-andere')">Andere</button>
   </div>
   <button class="sec full" onclick="zeigeSeite('wf-name')">⬅ Zurück</button>
+  <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-reh" class="page">
@@ -659,6 +664,7 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="setWildDetail('Rehwild','Kitz')">Kitz</button>
   </div>
   <button class="sec full" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
+  <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-hirsch" class="page">
@@ -671,6 +677,7 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="setWildDetail('Rotwild','Kalb')">Kalb</button>
   </div>
   <button class="sec full" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
+  <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-gams" class="page">
@@ -682,6 +689,7 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="setWildDetail('Gamswild','Kitz')">Kitz</button>
   </div>
   <button class="sec full" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
+  <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-andere" class="page">
@@ -689,6 +697,7 @@ tr:hover { background: var(--gruen-l); }
   <input id="andereInput" autocomplete="off" placeholder="Wildart eingeben...">
   <button onclick="setAndere()">Weiter ➡</button>
   <button class="sec" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
+  <button class="sec" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-gewicht" class="page">
@@ -696,6 +705,7 @@ tr:hover { background: var(--gruen-l); }
   <select id="inputGewicht"></select>
   <button onclick="nextOrt()">Weiter ➡</button>
   <button class="sec" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
+  <button class="sec" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-ort" class="page">
@@ -715,6 +725,7 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="setAndereOrt()">Weiter ➡</button>
   </div>
   <button class="sec full" onclick="zeigeSeite('wf-gewicht')">⬅ Zurück</button>
+  <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-zeit" class="page">
@@ -723,6 +734,7 @@ tr:hover { background: var(--gruen-l); }
   <p class="hint">Automatisch auf aktuelle Uhrzeit gesetzt.</p>
   <button onclick="nextDatum()">Weiter ➡</button>
   <button class="sec" onclick="zeigeSeite('wf-ort')">⬅ Zurück</button>
+  <button class="sec" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-datum" class="page">
@@ -731,6 +743,7 @@ tr:hover { background: var(--gruen-l); }
   <p class="hint">Automatisch auf heute gesetzt.</p>
   <button onclick="nextVerwendung()">Weiter ➡</button>
   <button class="sec" onclick="zeigeSeite('wf-zeit')">⬅ Zurück</button>
+  <button class="sec" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <div id="wf-verwendung" class="page">
@@ -740,6 +753,7 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="gotoSummary('Verkauf')">Verkauf</button>
   </div>
   <button class="sec full" onclick="zeigeSeite('wf-datum')">⬅ Zurück</button>
+  <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
 <!-- ZUSAMMENFASSUNG -->
@@ -749,7 +763,7 @@ tr:hover { background: var(--gruen-l); }
   <div class="topbar" style="margin-top:12px;">
     <button onclick="finishSave()">💾 Speichern</button>
     <button class="sec" onclick="editFromSummary()">✏️ Bearbeiten</button>
-    <button class="danger" onclick="zeigeSeite('revier')">✕ Abbrechen</button>
+    <button class="danger" onclick="workflowAbort()">✕ Abbrechen</button>
   </div>
 </div>
 
@@ -807,6 +821,13 @@ tr:hover { background: var(--gruen-l); }
         </label>
       </div>
       <p class="hint">Ausgeschaltet: Nur der Admin sieht den Plan-Button.</p>
+      <div class="admin-row" style="margin-top:10px;">
+        <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;">
+          <input id="cfgCardsCompact" type="checkbox" style="width:auto;margin:0;">
+          📋 Einträge kompakt anzeigen (zum Aufklappen)
+        </label>
+      </div>
+      <p class="hint">Eingeschaltet: Jeder Eintrag zeigt nur Name · Wildart · Datum, und wird beim Tippen aufgeklappt.</p>
     </div>
 
     <div class="admin-section">
@@ -1039,6 +1060,7 @@ if (!config.revier) config.revier = "Jagdrevier Prad";
 if (!config.code) config.code = "1024";
 if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
 if (typeof config.planVisible === "undefined") config.planVisible = true;
+if (typeof config.cardsCompact === "undefined") config.cardsCompact = true;
 
 /* ---------- Echte Daten: werden aus der API geladen ---------- */
 let daten = [];                 // alle Einträge (aus api/daten.php)
@@ -1319,6 +1341,8 @@ function applyConfig() {
   // Checkbox im Admin-Panel
   const cfgPlan = document.getElementById("cfgPlanVisible");
   if (cfgPlan) cfgPlan.checked = (config.planVisible !== false);
+  const cfgCC = document.getElementById("cfgCardsCompact");
+  if (cfgCC) cfgCC.checked = (config.cardsCompact !== false);
 
   const fab = document.getElementById("adminFab");
   if (fab) {
@@ -1334,45 +1358,7 @@ function saveCfg() { localStorage.setItem("cfg", JSON.stringify(config)); }
 function speichern() { /* no-op: DB ist die Wahrheit */ }
 
 /* ---------- Navigation ---------- */
-/* ---------- Workflow-Fortschrittsanzeige ---------- */
-/* Reihenfolge der Hauptschritte mit Label. Unterauswahlen (wf-reh etc.)
-   werden unter "Wildart" zusammengefasst, weil sie nur Sub-Pages von wf-wild sind. */
-const WF_STEPS = [
-  { id: "wf-name",       label: "Name" },
-  { id: "wf-wild",       label: "Wildart" },
-  { id: "wf-gewicht",    label: "Gewicht" },
-  { id: "wf-ort",        label: "Ort" },
-  { id: "wf-zeit",       label: "Schusszeit" },
-  { id: "wf-datum",      label: "Datum" },
-  { id: "wf-verwendung", label: "Verwendung" },
-  { id: "wf-summary",    label: "Zusammenfassung" },
-];
-const WF_SUB = {
-  "wf-reh":    { parent: "wf-wild",    label: "Rehwild – Klasse" },
-  "wf-hirsch": { parent: "wf-wild",    label: "Rotwild – Klasse" },
-  "wf-gams":   { parent: "wf-wild",    label: "Gamswild – Klasse" },
-  "wf-andere": { parent: "wf-wild",    label: "Andere Wildart" },
-};
-
-function updateWorkflowProgress(id) {
-  const box = document.getElementById("wfProgress");
-  if (!box) return;
-  const isWf = id && (id.startsWith("wf-") || WF_SUB[id]);
-  if (!isWf) {
-    box.style.display = "none";
-    return;
-  }
-  const mainId = WF_SUB[id] ? WF_SUB[id].parent : id;
-  const idx = WF_STEPS.findIndex(s => s.id === mainId);
-  const total = WF_STEPS.length;
-  const step  = idx >= 0 ? idx + 1 : 1;
-  const label = WF_SUB[id] ? WF_SUB[id].label : (WF_STEPS[idx] && WF_STEPS[idx].label) || "";
-  box.style.display = "block";
-  document.getElementById("wfProgressFill").style.width = Math.round((step / total) * 100) + "%";
-  document.getElementById("wfProgressText").textContent =
-    "Schritt " + step + " von " + total + " · " + label;
-}
-
+/* ---------- Workflow-Abbruch ---------- */
 function workflowAbort() {
   if (!confirm("Eintrag wirklich abbrechen? Alles bisher eingetippte geht verloren.")) return;
   e = {};
@@ -1385,7 +1371,6 @@ function zeigeSeite(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   const el = document.getElementById(id);
   if (el) el.classList.add("active");
-  updateWorkflowProgress(id);
 }
 
 /* ---------- Year ---------- */
@@ -1973,6 +1958,9 @@ function neuerEintrag() {
   e = {}; aktuellerPunkt = null;
   document.getElementById("inputName").value = "";
   document.getElementById("andereInput").value = "";
+  // Gewicht zurück auf "bitte wählen" (Placeholder ist value="")
+  const gsel = document.getElementById("inputGewicht");
+  if (gsel) gsel.value = "";
   document.getElementById("inputOrt").value = "";
   document.getElementById("andereOrtBox").style.display = "none";
   const now = new Date();
@@ -2013,7 +2001,9 @@ function setAndere() {
 function nextOrt() {
   const g = document.getElementById("inputGewicht").value;
   if (g === "" || parseInt(g, 10) <= 0) {
-    return alert("Bitte ein Gewicht > 0 auswählen.");
+    toast("Bitte ein Gewicht > 0 auswählen", "warn");
+    document.getElementById("inputGewicht").focus();
+    return;
   }
   e.gewicht = g;
   zeigeSeite("wf-ort");
@@ -2466,47 +2456,57 @@ function anzeigen() {
     }
   });
 
-  // Mobile Cards
+  // Mobile Cards (kompakt oder detailliert, siehe config.cardsCompact)
+  const compact = config.cardsCompact !== false;  // Default: kompakt
   const cc = document.getElementById("cardsContainer");
   cc.innerHTML = "";
   fd.forEach((d,fi) => {
     const ri = realIdx(fi);
     const card = document.createElement("div");
-    card.className = "card" + (d.gemeldet ? " card-gemeldet" : "");
+    card.className = "card" + (d.gemeldet ? " card-gemeldet" : "") + (compact ? " card-compact" : "");
+    card.dataset.id = ri;
     const wt = (d.gemeldet ? "🔒 " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
     const ortH = d.latlng
-      ? `<span class="link" onclick="openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`
+      ? `<span class="link" onclick="event.stopPropagation();openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`
       : esc(d.ort||"");
 
     let entH = !d.entnommen
-      ? `<span class="tag-btn tag-ent" onclick="pickDate(${ri})">+ Entnahme</span><input type="date" id="mdt${ri}" style="display:none;" onchange="setEntnommen(${ri},this.value)">`
+      ? `<span class="tag-btn tag-ent" onclick="event.stopPropagation();pickDate(${ri})">+ Entnahme</span><input type="date" id="mdt${ri}" style="display:none;" onchange="setEntnommen(${ri},this.value)">`
       : `<span class="tag-btn tag-done">${formatDatum(d.entnommen)}</span>`;
 
     let abfH = d.abfall==null
-      ? `<span class="tag-btn tag-abf" onclick="handleAbfall(${ri})">+ Abfall</span>`
+      ? `<span class="tag-btn tag-abf" onclick="event.stopPropagation();handleAbfall(${ri})">+ Abfall</span>`
       : d.abfall==="ja"
         ? `<span class="tag-btn tag-ja">Abfall: Ja</span>`
         : `<span class="tag-btn tag-nein">Abfall: Nein</span>`;
 
     let adminH = isAdmin
-      ? `<span class="tag-btn tag-edit" onclick="openEdit(${ri})">✏️</span> <span class="tag-btn tag-del" onclick="loeschen(${ri})">✕</span>`
+      ? `<span class="tag-btn tag-edit" onclick="event.stopPropagation();openEdit(${ri})">✏️</span> <span class="tag-btn tag-del" onclick="event.stopPropagation();loeschen(${ri})">✕</span>`
       : '';
 
+    // Kompakte Zeile: Name · Wildart · Datum, klickbar zum Aufklappen
     card.innerHTML = `
-      <div class="card-head">
-        <strong>${esc(wt)}</strong>
-        <span>${adminH}</span>
+      <div class="card-head" onclick="toggleCardExpand(this.parentElement)">
+        <div class="card-compact-line">
+          <strong>${esc(d.name||"")}</strong>
+          <span class="card-compact-wild">${esc(wt)}</span>
+          <span class="card-compact-date">${formatDatum(d.datum)}</span>
+          <span class="card-expand-chevron">▼</span>
+        </div>
       </div>
-      <div class="card-grid">
-        <div><span class="label">Erleger</span><br>${esc(d.name||"")}</div>
-        <div><span class="label">Gewicht</span><br>${d.gewicht ? d.gewicht+" kg" : "–"}</div>
-        <div><span class="label">Ort</span><br>${ortH}</div>
-        <div><span class="label">Zeit</span><br>${esc(d.zeit||"")}</div>
-        <div><span class="label">Datum</span><br>${formatDatum(d.datum)}</div>
-        <div><span class="label">Verwendung</span><br>${esc(d.verwendung||"–")}</div>
-      </div>
-      ${d.wetter ? `<div style="font-size:11px;color:var(--grau);margin-top:4px;">🌡️ ${esc(d.wetter)}</div>` : ''}
-      <div class="card-actions">${entH} ${abfH}</div>`;
+      <div class="card-body">
+        <div class="card-head-admin">${adminH}</div>
+        <div class="card-grid">
+          <div><span class="label">Erleger</span><br>${esc(d.name||"")}</div>
+          <div><span class="label">Gewicht</span><br>${d.gewicht ? d.gewicht+" kg" : "–"}</div>
+          <div><span class="label">Ort</span><br>${ortH}</div>
+          <div><span class="label">Zeit</span><br>${esc(d.zeit||"")}</div>
+          <div><span class="label">Datum</span><br>${formatDatum(d.datum)}</div>
+          <div><span class="label">Verwendung</span><br>${esc(d.verwendung||"–")}</div>
+        </div>
+        ${d.wetter ? `<div style="font-size:11px;color:var(--grau);margin-top:4px;">🌡️ ${esc(d.wetter)}</div>` : ''}
+        <div class="card-actions">${entH} ${abfH}</div>
+      </div>`;
     cc.appendChild(card);
   });
 
@@ -2741,6 +2741,14 @@ function toast(msg, kind) {
   }, 2800);
 }
 
+/* Kartenansicht: Kompakt ↔ Detail umschalten */
+function toggleCardExpand(cardEl) {
+  if (!cardEl) return;
+  // Nur kompakt-Karten sind klappbar
+  if (!cardEl.classList.contains("card-compact")) return;
+  cardEl.classList.toggle("expanded");
+}
+
 function adminTab(id) {
   document.querySelectorAll(".admin-tab").forEach(t =>
     t.classList.toggle("active", t.dataset.tab === id)
@@ -2799,7 +2807,9 @@ function saveConfig() {
   config.code = document.getElementById("cfgCode").value.trim() || "1024";
   config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
   config.planVisible = document.getElementById("cfgPlanVisible").checked;
+  config.cardsCompact = document.getElementById("cfgCardsCompact").checked;
   saveCfg(); applyConfig();
+  anzeigen();     // Tabelle neu rendern, damit die Card-Darstellung wechselt
   toast("✓ Einstellungen gespeichert");
 }
 
