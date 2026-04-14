@@ -508,9 +508,12 @@ tr:hover { background: var(--gruen-l); }
 
 <div id="wf-ort" class="page">
   <h3>📍 Örtlichkeit</h3>
-  <div class="btn-grid">
-    <button onclick="setOrt('Prad')">Prad (Karte)</button>
-    <button onclick="zeigeAndereOrt()">Andere</button>
+  <button onclick="useHereAsLocation()" style="width:100%;background:var(--blau);">
+    📡 Jetzt hier (GPS)
+  </button>
+  <div class="btn-grid" style="margin-top:8px;">
+    <button onclick="setOrt('Prad')">🗺️ Karte öffnen</button>
+    <button class="sec" onclick="zeigeAndereOrt()">Andere</button>
   </div>
   <div id="andereOrtBox" style="display:none;margin-top:8px;">
     <input id="inputOrt" placeholder="Ort eingeben..." autocomplete="off">
@@ -1194,6 +1197,34 @@ function setAndere() {
 }
 function nextOrt() { e.gewicht = document.getElementById("inputGewicht").value; zeigeSeite("wf-ort"); }
 function setOrt(o) { o==="Prad" ? openMap("input") : (e.ort=o, zeigeSeite("wf-zeit")); }
+
+/* Direkter GPS-Abschuss-Ort: ohne Karte, nimm den aktuellen Standort */
+function useHereAsLocation() {
+  if (!navigator.geolocation) {
+    alert("Standort wird vom Browser nicht unterstützt. Bitte Karte benutzen.");
+    return;
+  }
+  // Feedback, während auf GPS gewartet wird
+  const hint = document.createElement("div");
+  hint.textContent = "📡 Standort wird ermittelt…";
+  hint.style.cssText = "margin-top:8px;padding:10px;background:#e3f2fd;border-radius:8px;color:#1565c0;";
+  document.querySelector("#wf-ort").appendChild(hint);
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      hint.remove();
+      e.latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      e.ort = "Prad";
+      zeigeSeite("wf-zeit");
+    },
+    err => {
+      hint.remove();
+      alert("Standort nicht verfügbar: " + err.message +
+            "\nBitte stattdessen Karte öffnen oder Ort manuell eingeben.");
+    },
+    { enableHighAccuracy: true, timeout: 15000 }
+  );
+}
 function zeigeAndereOrt() {
   document.getElementById("andereOrtBox").style.display="block";
   document.getElementById("inputOrt").focus();
