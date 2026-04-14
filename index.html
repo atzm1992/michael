@@ -431,6 +431,8 @@ tr:hover { background: var(--gruen-l); }
     <button onclick="openPlanPopup()">📋 Plan</button>
     <button class="sec" onclick="zeigeSeite('start')">⬅ Zurück</button>
   </div>
+  <input id="sucheInput" type="search" placeholder="🔍 Suche: Name, Wildart, Ort…"
+         oninput="onSucheChange()" autocomplete="off" style="margin:6px 0;">
   <div class="table-wrapper"><table id="tabelle"></table></div>
   <div class="cards" id="cardsContainer"></div>
 </div>
@@ -941,8 +943,24 @@ function updateYearTabs() {
   });
 }
 
+let sucheText = "";
+function onSucheChange() {
+  const el = document.getElementById("sucheInput");
+  sucheText = (el ? el.value : "").toLowerCase().trim();
+  anzeigen();
+}
+function matchesSearch(d, q) {
+  if (!q) return true;
+  const hay = [d.name, d.wildart, d.wild, d.ort, d.verwendung]
+              .map(x => (x || "").toString().toLowerCase()).join(" ");
+  return hay.includes(q);
+}
 function getFiltered() {
-  return daten.filter(d => d.datum && new Date(d.datum).getFullYear() === selectedYear);
+  return daten.filter(d =>
+    d.datum &&
+    new Date(d.datum).getFullYear() === selectedYear &&
+    matchesSearch(d, sucheText)
+  );
 }
 /* Liefert die id eines Filter-Index (nicht mehr den Array-Index!) */
 function realId(fi) { const d = getFiltered()[fi]; return d ? d.id : null; }
