@@ -45,7 +45,13 @@ function loadEntry(PDO $pdo, int $id): ?array {
     $s = $pdo->prepare('SELECT * FROM eintraege WHERE id = :id');
     $s->execute([':id' => $id]);
     $row = $s->fetch();
-    return $row ?: null;
+    if (!$row) return null;
+    // Typen erzwingen, damit JSON garantiert Zahlen statt Strings liefert
+    $row['id']       = (int) $row['id'];
+    $row['gemeldet'] = (int) $row['gemeldet'];
+    if ($row['gewicht'] !== null) $row['gewicht'] = (int) $row['gewicht'];
+    if ($row['jahr']    !== null) $row['jahr']    = (int) $row['jahr'];
+    return $row;
 }
 
 function entryIsLocked(array $entry): bool {
@@ -61,7 +67,16 @@ if ($method === 'GET') {
     } else {
         $s = $pdo->query('SELECT * FROM eintraege ORDER BY datum DESC, id DESC');
     }
-    jsonOk($s->fetchAll());
+    $rows = $s->fetchAll();
+    // Typen hart setzen (s. loadEntry)
+    foreach ($rows as &$r) {
+        $r['id']       = (int) $r['id'];
+        $r['gemeldet'] = (int) $r['gemeldet'];
+        if ($r['gewicht'] !== null) $r['gewicht'] = (int) $r['gewicht'];
+        if ($r['jahr']    !== null) $r['jahr']    = (int) $r['jahr'];
+    }
+    unset($r);
+    jsonOk($rows);
 }
 
 /* ================= POST =================
