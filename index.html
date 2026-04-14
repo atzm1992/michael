@@ -919,8 +919,17 @@ const api = {
    Neue Einträge speichern echte GPS-Koordinaten in koord_lat / koord_lng.
    koord_x / koord_y sind nur noch Legacy (wird nicht mehr geschrieben). */
 function dbToClient(row) {
-  const lat = row.koord_lat != null ? parseFloat(row.koord_lat) : null;
-  const lng = row.koord_lng != null ? parseFloat(row.koord_lng) : null;
+  const rawLat = row.koord_lat;
+  const rawLng = row.koord_lng;
+  let lat = null, lng = null;
+  if (rawLat !== null && rawLat !== undefined && rawLat !== '') {
+    const f = parseFloat(rawLat);
+    if (!isNaN(f) && isFinite(f)) lat = f;
+  }
+  if (rawLng !== null && rawLng !== undefined && rawLng !== '') {
+    const f = parseFloat(rawLng);
+    if (!isNaN(f) && isFinite(f)) lng = f;
+  }
   return {
     id:         row.id,
     name:       row.name || "",
@@ -1711,23 +1720,35 @@ function openMap(mode, idOrNull) {
 function setupMapMarkers(mode) {
   const map = leafletMap;
   if (!map) return;
+  // Sicherheitshalber: Entry-Layer muss existieren und mit der Map verbunden sein
+  if (!leafletEntryLayer || !map.hasLayer(leafletEntryLayer)) {
+    leafletEntryLayer = L.layerGroup().addTo(map);
+  }
   clearMarkers();
+
+  function validLL(ll) {
+    return ll && typeof ll.lat === 'number' && typeof ll.lng === 'number'
+      && !isNaN(ll.lat) && !isNaN(ll.lng)
+      && isFinite(ll.lat) && isFinite(ll.lng);
+  }
 
   if (mode === "input") {
     map.setView(PRAD_CENTER, PRAD_ZOOM);
-    if (e.latlng) {
+    if (validLL(e.latlng)) {
       leafletTempMarker = L.marker(e.latlng, { icon: makeDivIcon(e.wildart) }).addTo(map);
     }
   } else if (mode === "view") {
     const points = [];
-    getFiltered().forEach(d => {
-      if (d.latlng) {
+    const fd = getFiltered();
+    fd.forEach(d => {
+      if (validLL(d.latlng)) {
         L.marker(d.latlng, { icon: makeDivIcon(d.wildart) })
           .bindTooltip(`${d.name}: ${d.wildart} ${d.wild||''} (${formatDatum(d.datum)})`)
           .addTo(leafletEntryLayer);
         points.push([d.latlng.lat, d.latlng.lng]);
       }
     });
+    console.log('[Karte] view: ' + points.length + ' von ' + fd.length + ' Einträgen haben gültige Koordinaten.');
     if (points.length) {
       map.fitBounds(points, { padding: [20, 20], maxZoom: 16 });
     } else {
@@ -1735,7 +1756,8 @@ function setupMapMarkers(mode) {
     }
   } else if (mode === "single") {
     const d = daten.find(x => x.id === viewIndex);
-    if (d && d.latlng) {
+    console.log('[Karte] single: id=' + viewIndex + ', gefunden=' + !!d + ', latlng=', d && d.latlng);
+    if (d && validLL(d.latlng)) {
       L.marker(d.latlng, { icon: makeDivIcon(d.wildart) })
         .bindTooltip(`${d.name}: ${d.wildart} ${d.wild||''}`)
         .addTo(leafletEntryLayer);
