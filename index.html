@@ -5,6 +5,13 @@
 <title>Abschussliste Jagdverein Prad</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#2e7d32">
+
+<!-- Leaflet (Open-Source-Karten-Bibliothek, nutzt OpenStreetMap-Tiles) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
 <style>
 :root {
   --gruen: #2e7d32;
@@ -260,7 +267,30 @@ tr:hover { background: var(--gruen-l); }
 }
 .marker-legend { font-size: 12px; margin-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
 .marker-legend span { display: inline-flex; align-items: center; gap: 4px; }
-.marker-legend i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.5); display: inline-block; }
+.marker-legend i {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #000;
+  display: inline-block;
+}
+
+/* Leaflet-Overrides: Karte nicht höher als Popup, Marker als farbige Kreise */
+#mapContainer .wild-marker {
+  background: #1E88E5;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 1px #000, 0 2px 6px rgba(0,0,0,0.4);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+}
+#mapContainer .wild-marker.reh  { background: #FFD600; }
+#mapContainer .wild-marker.rot  { background: #E53935; }
+#mapContainer .wild-marker.gams { background: #424242; }
+#mapContainer .wild-marker.fox  { background: #FF6D00; }
+#mapContainer .leaflet-div-icon {
+  background: transparent;
+  border: none;
+}
 
 .hint { font-size: 12px; color: #555; margin: 6px 0; }
 
@@ -578,21 +608,22 @@ tr:hover { background: var(--gruen-l); }
 
 <!-- KARTE POPUP -->
 <div id="mapOverlay" class="popup-overlay" style="display:none;" onclick="closeMap()"></div>
-<div id="mapPopup" class="popup" style="display:none;max-width:500px;">
+<div id="mapPopup" class="popup" style="display:none;max-width:560px;">
   <h3>🗺️ Karte Prad</h3>
-  <div id="mapContainer" style="position:relative;">
-    <img id="mapImage" alt="Revierkarte"
-         src="https://raw.githubusercontent.com/MichaelUnterkircher/meine-website/main/Revier2.png"
-         style="width:100%;display:block;cursor:crosshair;"
-         onerror="this.alt='Karte nicht verfügbar'">
-  </div>
+  <div id="mapContainer" style="position:relative;width:100%;height:380px;
+       border-radius:8px;overflow:hidden;"></div>
   <div class="marker-legend">
-    <span><i style="background:yellow"></i>Reh</span>
-    <span><i style="background:red"></i>Rot</span>
-    <span><i style="background:#888"></i>Gams</span>
-    <span><i style="background:blue"></i>Sonst</span>
+    <span><i style="background:#FFD600"></i>Reh</span>
+    <span><i style="background:#E53935"></i>Rot</span>
+    <span><i style="background:#424242"></i>Gams</span>
+    <span><i style="background:#FF6D00"></i>Fuchs/Hase</span>
+    <span><i style="background:#1E88E5"></i>Sonst</span>
   </div>
   <p class="hint" id="mapHint">Tippe auf die Karte, um den Abschussort zu markieren.</p>
+  <div class="topbar" style="margin-top:6px;">
+    <button class="sm sec" onclick="mapUseMyLocation()">📍 Mein Standort</button>
+    <button class="sm sec" onclick="mapCenterPrad()">🏡 Prad zentrieren</button>
+  </div>
   <button class="full" onclick="closeMap()">OK</button>
 </div>
 
@@ -690,8 +721,12 @@ const api = {
   },
 };
 
-/* Mapper zwischen DB-Zeile und Frontend-Objekt (koord_x/y ⇄ koord{x,y}) */
+/* Mapper zwischen DB-Zeile und Frontend-Objekt.
+   Neue Einträge speichern echte GPS-Koordinaten in koord_lat / koord_lng.
+   koord_x / koord_y sind nur noch Legacy (wird nicht mehr geschrieben). */
 function dbToClient(row) {
+  const lat = row.koord_lat != null ? parseFloat(row.koord_lat) : null;
+  const lng = row.koord_lng != null ? parseFloat(row.koord_lng) : null;
   return {
     id:         row.id,
     name:       row.name || "",
@@ -699,9 +734,7 @@ function dbToClient(row) {
     wild:       row.wild || "",
     gewicht:    row.gewicht,
     ort:        row.ort || "",
-    koord:      (row.koord_x != null && row.koord_y != null)
-                ? { x: parseFloat(row.koord_x), y: parseFloat(row.koord_y) }
-                : null,
+    latlng:     (lat != null && lng != null) ? { lat, lng } : null,
     zeit:       row.zeit || "",
     datum:      row.datum || "",
     verwendung: row.verwendung || "",
@@ -717,8 +750,8 @@ function clientToDb(ev) {
     wild:       ev.wild,
     gewicht:    ev.gewicht !== "" ? ev.gewicht : null,
     ort:        ev.ort,
-    koord_x:    ev.koord ? ev.koord.x : null,
-    koord_y:    ev.koord ? ev.koord.y : null,
+    koord_lat:  ev.latlng ? ev.latlng.lat : null,
+    koord_lng:  ev.latlng ? ev.latlng.lng : null,
     zeit:       ev.zeit,
     datum:      ev.datum,
     verwendung: ev.verwendung,
@@ -1138,7 +1171,7 @@ function showSummary() {
     ["Wildart", e.wildart + (e.wild ? " – "+e.wild : "")],
     ["Gewicht", e.gewicht ? e.gewicht+" kg" : "–"],
     ["Ort", e.ort || "–"],
-    ["Karte", e.koord ? "✓ Markiert" : "–"],
+    ["Karte", e.latlng ? "✓ Markiert" : "–"],
     ["Schusszeit", e.zeit || "–"],
     ["Datum", formatDatum(e.datum)],
     ["Verwendung", e.verwendung || "–"],
@@ -1190,44 +1223,156 @@ function applyRow(row) {
   return mapped;
 }
 
-/* ---------- Karte ---------- */
+/* ============================================================
+   KARTE (Leaflet + OpenStreetMap)
+   Default-Ansicht: Gemeindegebiet Prad am Stilfserjoch
+   ============================================================ */
+
+// Zentrum Prad, Default-Zoom (etwa Gemeindegebiet)
+const PRAD_CENTER = [46.6175, 10.5942];
+const PRAD_ZOOM   = 13;
+
+let leafletMap = null;
+let leafletClickHandler = null;
+let leafletTempMarker = null;  // der temporäre Klick-Marker beim Eintragen
+let leafletEntryLayer = null;  // Layer für alle Eintrags-Marker
+
+function ensureLeaflet() {
+  if (leafletMap) return leafletMap;
+  leafletMap = L.map('mapContainer', {
+    center: PRAD_CENTER,
+    zoom: PRAD_ZOOM,
+    zoomControl: true,
+    attributionControl: true,
+  });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap-Mitwirkende'
+  }).addTo(leafletMap);
+
+  leafletEntryLayer = L.layerGroup().addTo(leafletMap);
+
+  leafletClickHandler = function (ev) {
+    if (mapMode !== 'input') return;
+    aktuellerPunkt = { lat: ev.latlng.lat, lng: ev.latlng.lng };
+    if (leafletTempMarker) leafletTempMarker.remove();
+    leafletTempMarker = L.marker(ev.latlng, {
+      icon: makeDivIcon(e.wildart)
+    }).addTo(leafletMap);
+  };
+  leafletMap.on('click', leafletClickHandler);
+  return leafletMap;
+}
+
+function wildartClass(w) {
+  if (w === 'Rehwild')  return 'reh';
+  if (w === 'Rotwild')  return 'rot';
+  if (w === 'Gamswild') return 'gams';
+  if (w === 'Fuchs' || w === 'Hase') return 'fox';
+  return '';
+}
+
+function makeDivIcon(wildart) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="wild-marker ${wildartClass(wildart)}"></div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+function clearMarkers() {
+  if (leafletEntryLayer) leafletEntryLayer.clearLayers();
+  if (leafletTempMarker) { leafletTempMarker.remove(); leafletTempMarker = null; }
+}
+
 function openMap(mode, idOrNull) {
   mapMode = mode; viewIndex = idOrNull ?? null;
   document.getElementById("mapOverlay").style.display = "block";
   document.getElementById("mapPopup").style.display = "block";
-  document.getElementById("mapHint").style.display = mode==="input" ? "block" : "none";
+  document.getElementById("mapHint").style.display = mode === "input" ? "block" : "none";
+
+  const map = ensureLeaflet();
+
+  // Leaflet braucht invalidateSize(), wenn der Container während des Popup-
+  // Öffnens zum ersten Mal sichtbar wird.
+  setTimeout(() => map.invalidateSize(), 50);
+
   clearMarkers();
-  if (mode==="input" && e.koord) {
-    drawMarker(e.koord.x, e.koord.y, e.wildart);
-  } else if (mode==="view") {
-    getFiltered().forEach(d => { if (d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart); });
-  } else if (mode==="single") {
+
+  if (mode === "input") {
+    map.setView(PRAD_CENTER, PRAD_ZOOM);
+    if (e.latlng) {
+      leafletTempMarker = L.marker(e.latlng, { icon: makeDivIcon(e.wildart) }).addTo(map);
+    }
+  } else if (mode === "view") {
+    const points = [];
+    getFiltered().forEach(d => {
+      if (d.latlng) {
+        L.marker(d.latlng, { icon: makeDivIcon(d.wildart) })
+          .bindTooltip(`${d.name}: ${d.wildart} ${d.wild||''} (${formatDatum(d.datum)})`)
+          .addTo(leafletEntryLayer);
+        points.push([d.latlng.lat, d.latlng.lng]);
+      }
+    });
+    if (points.length) {
+      map.fitBounds(points, { padding: [20, 20], maxZoom: 16 });
+    } else {
+      map.setView(PRAD_CENTER, PRAD_ZOOM);
+    }
+  } else if (mode === "single") {
     const d = daten.find(x => x.id === viewIndex);
-    if (d && d.koord) drawMarker(d.koord.x, d.koord.y, d.wildart);
+    if (d && d.latlng) {
+      L.marker(d.latlng, { icon: makeDivIcon(d.wildart) })
+        .bindTooltip(`${d.name}: ${d.wildart} ${d.wild||''}`)
+        .addTo(leafletEntryLayer);
+      map.setView([d.latlng.lat, d.latlng.lng], 15);
+    } else {
+      map.setView(PRAD_CENTER, PRAD_ZOOM);
+    }
   }
 }
 function openMapAll() { openMap("view"); }
 function openMapFromTable(id) { openMap("single", id); }
-function clearMarkers() { document.querySelectorAll("#mapContainer .marker").forEach(m=>m.remove()); }
+
 function closeMap() {
   document.getElementById("mapOverlay").style.display = "none";
   document.getElementById("mapPopup").style.display = "none";
-  if (mapMode==="input") { if (aktuellerPunkt) e.koord=aktuellerPunkt; e.ort="Prad"; zeigeSeite("wf-zeit"); }
+  if (mapMode === "input") {
+    if (aktuellerPunkt) e.latlng = aktuellerPunkt;
+    e.ort = "Prad";
+    zeigeSeite("wf-zeit");
+  }
+  aktuellerPunkt = null;
 }
-function drawMarker(x,y,w) {
-  const c=document.getElementById("mapContainer"), m=document.createElement("div");
-  m.className="marker";
-  const cl={"Rehwild":"yellow","Rotwild":"red","Gamswild":"#888"};
-  m.style.background=cl[w]||"blue";
-  m.style.left=(x*100)+"%"; m.style.top=(y*100)+"%";
-  c.appendChild(m);
+
+/* Karten-Aktionen: Standort / Zentrieren */
+function mapCenterPrad() {
+  if (leafletMap) leafletMap.setView(PRAD_CENTER, PRAD_ZOOM);
 }
-document.getElementById("mapImage").addEventListener("click", function(ev) {
-  if (mapMode!=="input") return;
-  const r=this.getBoundingClientRect();
-  aktuellerPunkt = { x:(ev.clientX-r.left)/r.width, y:(ev.clientY-r.top)/r.height };
-  clearMarkers(); drawMarker(aktuellerPunkt.x, aktuellerPunkt.y, e.wildart);
-});
+function mapUseMyLocation() {
+  if (!navigator.geolocation) {
+    alert("Geolocation wird vom Browser nicht unterstützt.");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const map = ensureLeaflet();
+      map.setView([lat, lng], 17);
+      if (mapMode === "input") {
+        aktuellerPunkt = { lat, lng };
+        if (leafletTempMarker) leafletTempMarker.remove();
+        leafletTempMarker = L.marker([lat, lng], { icon: makeDivIcon(e.wildart) }).addTo(map);
+      }
+    },
+    err => {
+      alert("Standort nicht verfügbar: " + err.message);
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
 
 /* ============================================================
    ANZEIGE
@@ -1255,7 +1400,7 @@ function anzeigen() {
     r.insertCell().innerText = d.gewicht||"";
 
     const oc = r.insertCell();
-    if (d.ort==="Prad" && d.koord) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>`;
+    if (d.ort==="Prad" && d.latlng) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>`;
     else oc.innerText = d.ort||"";
 
     r.insertCell().innerText = d.zeit||"";
@@ -1295,7 +1440,7 @@ function anzeigen() {
     const card = document.createElement("div");
     card.className = "card" + (d.gemeldet ? " card-gemeldet" : "");
     const wt = (d.gemeldet ? "🔒 " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
-    const ortH = (d.ort==="Prad"&&d.koord) ? `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>` : esc(d.ort||"");
+    const ortH = (d.ort==="Prad"&&d.latlng) ? `<span class="link" onclick="openMapFromTable(${ri})">Prad 📍</span>` : esc(d.ort||"");
 
     let entH = !d.entnommen
       ? `<span class="tag-btn tag-ent" onclick="pickDate(${ri})">+ Entnahme</span><input type="date" id="mdt${ri}" style="display:none;" onchange="setEntnommen(${ri},this.value)">`
