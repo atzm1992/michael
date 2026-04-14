@@ -110,6 +110,37 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px rgba(46,125,50,0.2);
 }
 
+/* Wildkammer-Übersicht auf der Startseite */
+.wildkammer-box {
+  margin: 12px 0;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-left: 4px solid var(--gruen);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+.wildkammer-box h4 {
+  margin: 0 0 6px;
+  color: var(--gruen-d);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wildkammer-box .wk-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  color: #333;
+}
+.wildkammer-box .wk-count {
+  font-weight: bold;
+  color: var(--gruen-d);
+}
+.wildkammer-box .wk-empty {
+  color: var(--grau);
+  font-style: italic;
+}
+
 /* Admin-Button oben rechts (immer sichtbar) */
 .admin-fab {
   position: fixed;
@@ -364,6 +395,10 @@ tr:hover { background: var(--gruen-l); }
     <h2>Abschussliste<br>Jagdrevier Prad</h2>
     <div class="code">Zahlencode: 1024</div>
   </div>
+
+  <!-- Wildkammer-Übersicht: was aktuell eingelagert ist -->
+  <div id="wildkammerBox" class="wildkammer-box"></div>
+
   <div class="topbar">
     <button onclick="zeigeSeite('park')">🌲 Park</button>
     <button onclick="zeigeSeite('revier')">🎯 Revier</button>
@@ -912,6 +947,32 @@ function realId(fi) { const d = getFiltered()[fi]; return d ? d.id : null; }
 function realIdx(fi) { return realId(fi); }
 function findById(id) { return daten.findIndex(d => d.id === id); }
 
+/* ---------- Wildkammer-Status (auf der Startseite) ---------- */
+function updateWildkammer() {
+  const box = document.getElementById("wildkammerBox");
+  if (!box) return;
+  // In der Kühlung = Eintrag existiert, aber entnommen ist leer/null
+  const inStorage = daten.filter(d => d.datum && !d.entnommen);
+  const byArt = {};
+  inStorage.forEach(d => {
+    const a = d.wildart || "Sonstiges";
+    byArt[a] = (byArt[a] || 0) + 1;
+  });
+
+  let html = '<h4>❄️ Wildkühlkammer</h4>';
+  if (!inStorage.length) {
+    html += '<div class="wk-empty">– leer –</div>';
+  } else {
+    Object.keys(byArt).sort().forEach(k => {
+      html += `<div class="wk-row"><span>${esc(k)}</span><span class="wk-count">${byArt[k]}</span></div>`;
+    });
+    html += `<div class="wk-row" style="margin-top:6px;border-top:1px solid rgba(46,125,50,0.3);padding-top:4px;">
+      <span><b>Gesamt</b></span><span class="wk-count">${inStorage.length}</span>
+    </div>`;
+  }
+  box.innerHTML = html;
+}
+
 /* ---------- Stats ---------- */
 function updateStats() {
   const fd = getFiltered();
@@ -1374,7 +1435,7 @@ function mapUseMyLocation() {
    ANZEIGE
    ============================================================ */
 function anzeigen() {
-  updateStats(); applyConfig();
+  updateStats(); applyConfig(); updateWildkammer();
   const fd = getFiltered();
 
   // Desktop
