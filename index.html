@@ -376,7 +376,16 @@ tr:hover { background: var(--gruen-l); }
 .btn-grid button { width: 100%; margin: 0; }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 10px 0; }
-.stat-box { background: var(--gruen-l); padding: 10px; border-radius: var(--radius); text-align: center; }
+.stat-box {
+  background: var(--gruen-l); padding: 10px; border-radius: var(--radius);
+  text-align: center; cursor: pointer; user-select: none;
+  transition: background 0.15s, transform 0.05s;
+  border: 2px solid transparent;
+}
+.stat-box:hover { background: #c8e6c9; }
+.stat-box:active { transform: scale(0.97); }
+.stat-box.active { background: var(--gruen); border-color: var(--gruen-d); }
+.stat-box.active .num, .stat-box.active .lbl { color: #fff; }
 .stat-box .num { font-size: 1.5em; font-weight: bold; color: var(--gruen-d); }
 .stat-box .lbl { font-size: 11px; color: var(--grau); }
 
@@ -850,6 +859,7 @@ let mapMode = "input";
 let viewIndex = null;
 let singleViewEntry = null;   // beim Single-View per Tabellenklick gesetzt
 let selectedYear = new Date().getFullYear();
+let statsFilter = "";         // Filter per Klick auf eine Stat-Kachel
 let isAdmin = false;
 let currentUser = null;
 
@@ -1063,7 +1073,13 @@ function fillExportYears() {
 async function init() {
   const sel = document.getElementById("inputGewicht");
   sel.innerHTML = "";
-  for (let i = 0; i <= 200; i++) {
+  // Platzhalter, damit 0 kg nicht aus Versehen als Default ausgewählt ist.
+  {
+    const ph = document.createElement("option");
+    ph.value = ""; ph.text = "-- bitte wählen --"; ph.disabled = true; ph.selected = true;
+    sel.appendChild(ph);
+  }
+  for (let i = 1; i <= 200; i++) {
     const o = document.createElement("option");
     o.value = i; o.text = i + " kg";
     sel.appendChild(o);
@@ -1163,8 +1179,14 @@ function getFiltered() {
   return daten.filter(d =>
     d.datum &&
     new Date(d.datum).getFullYear() === selectedYear &&
+    (!statsFilter || (d.wildart || "Andere") === statsFilter) &&
     matchesSearch(d, sucheText)
   );
+}
+function setStatsFilter(wildart) {
+  // Toggle: nochmal auf die gleiche Kachel klicken hebt den Filter auf
+  statsFilter = (statsFilter === wildart) ? "" : wildart;
+  anzeigen();
 }
 /* Liefert die id eines Filter-Index (nicht mehr den Array-Index!) */
 function realId(fi) { const d = getFiltered()[fi]; return d ? d.id : null; }
@@ -1200,12 +1222,24 @@ function updateWildkammer() {
 
 /* ---------- Stats ---------- */
 function updateStats() {
-  const fd = getFiltered();
+  // Die Kacheln zählen IMMER alle Einträge des Jahres, unabhängig
+  // vom Such-/Stats-Filter, damit der Gesamtstand sichtbar bleibt.
+  const fdAll = daten.filter(d =>
+    d.datum && new Date(d.datum).getFullYear() === selectedYear
+  );
   const counts = {};
-  fd.forEach(d => { const w = d.wildart || "Andere"; counts[w] = (counts[w]||0) + 1; });
-  let h = `<div class="stat-box"><div class="num">${fd.length}</div><div class="lbl">Gesamt</div></div>`;
+  fdAll.forEach(d => { const w = d.wildart || "Andere"; counts[w] = (counts[w]||0) + 1; });
+
+  const active = statsFilter;
+  const totalClass = !active ? "stat-box active" : "stat-box";
+  let h = `<div class="${totalClass}" onclick="setStatsFilter('')" title="Alle anzeigen">
+             <div class="num">${fdAll.length}</div><div class="lbl">Gesamt</div>
+           </div>`;
   Object.keys(counts).sort().forEach(k => {
-    h += `<div class="stat-box"><div class="num">${counts[k]}</div><div class="lbl">${esc(k)}</div></div>`;
+    const cls = "stat-box" + (active === k ? " active" : "");
+    h += `<div class="${cls}" onclick="setStatsFilter('${esc(k).replace(/'/g, "\\'")}')" title="Nur ${esc(k)}">
+            <div class="num">${counts[k]}</div><div class="lbl">${esc(k)}</div>
+          </div>`;
   });
   document.getElementById("statsContainer").innerHTML = h;
 }
@@ -1491,7 +1525,14 @@ function setAndere() {
   if (!v) return alert("Bitte Wildart eingeben!");
   e.wildart=v; e.wild=""; zeigeSeite("wf-gewicht");
 }
-function nextOrt() { e.gewicht = document.getElementById("inputGewicht").value; zeigeSeite("wf-ort"); }
+function nextOrt() {
+  const g = document.getElementById("inputGewicht").value;
+  if (g === "" || parseInt(g, 10) <= 0) {
+    return alert("Bitte ein Gewicht > 0 auswählen.");
+  }
+  e.gewicht = g;
+  zeigeSeite("wf-ort");
+}
 function setOrt(o) { o==="Prad" ? openMap("input") : (e.ort=o, zeigeSeite("wf-zeit")); }
 
 /* Direkter GPS-Abschuss-Ort: ohne Karte, nimm den aktuellen Standort */
@@ -2003,16 +2044,22 @@ async function setEntnommen(id, val) {
 function handleAbfall(id) {
   if (istGesperrt(id)) return alertGesperrt();
   const ov = document.createElement("div");
-  ov.className = "popup-overlay";
-  ov.style.cssText = "display:block;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;";
+  ov.style.cssText =
+    "position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:block;";
   const box = document.createElement("div");
-  box.className = "popup";
-  box.style.cssText = "display:block;z-index:1000;";
+  box.style.cssText =
+    "position:fixed;left:50%;top:30vh;transform:translateX(-50%);" +
+    "width:92%;max-width:360px;background:#fff;padding:16px;" +
+    "border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.35);" +
+    "z-index:1000;display:block;";
   ov.onclick = () => { ov.remove(); box.remove(); };
+  box.onclick = ev => ev.stopPropagation();
   box.innerHTML = `<h3>Abfall</h3>
     <p style="margin:10px 0;">${esc(config.abfallText)}</p>
-    <button onclick="setAbfall(${id},'ja')">✅ Ja</button>
-    <button class="danger" onclick="setAbfall(${id},'nein')">❌ Nein</button>`;
+    <div class="topbar">
+      <button onclick="setAbfall(${id},'ja')">✅ Ja</button>
+      <button class="danger" onclick="setAbfall(${id},'nein')">❌ Nein</button>
+    </div>`;
   document.body.appendChild(ov); document.body.appendChild(box);
 }
 async function setAbfall(id, val) {
@@ -2063,11 +2110,26 @@ function openEdit(id) {
 
   const ov = document.createElement("div");
   ov.className = "popup-overlay";
-  ov.style.cssText = "display:block;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;";
+  ov.style.cssText =
+    "display:block;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;";
+
   const box = document.createElement("div");
-  box.className = "popup";
-  box.style.cssText = "display:block;z-index:1000;";
+  box.className = "popup edit-popup";
+  // Alles inline, damit kein CSS-Class-Regelwerk dazwischenfunkt:
+  // volle Breite auf Mobile, scrollbar, immer sichtbar.
+  box.style.cssText =
+    "position:fixed;" +
+    "left:4%;right:4%;top:4vh;" +
+    "transform:none;" +                      // transform aus .popup-Klasse killen
+    "width:auto;max-width:none;" +
+    "max-height:92vh;overflow-y:auto;" +
+    "background:#fff;padding:16px;border-radius:12px;" +
+    "box-shadow:0 10px 40px rgba(0,0,0,0.35);" +
+    "z-index:1000;display:block;" +
+    "-webkit-overflow-scrolling:touch;";
+  // Klick außerhalb schließt - aber NICHT auf dem Popup selbst
   ov.onclick = () => { ov.remove(); box.remove(); };
+  box.onclick = ev => ev.stopPropagation();
   box.innerHTML = `
     <h3>✏️ Eintrag bearbeiten</h3>
     <div class="edit-row"><label>Erleger</label><input id="ed_name" value="${esc(d.name||"")}"></div>
@@ -2128,6 +2190,7 @@ async function saveEdit(id) {
     abfall:     a === "" ? null : a,
     gemeldet:   document.getElementById("ed_gem").checked ? 1 : 0,
   };
+  console.log('[Edit] saveEdit id=', id, 'body=', body);
   try {
     const row = await api.updateEintrag(id, body);
     applyRow(row);
@@ -2135,7 +2198,15 @@ async function saveEdit(id) {
     updateYearTabs();
     anzeigen();
   } catch (err) {
-    alert("Speichern fehlgeschlagen: " + err.message);
+    console.error('[Edit] saveEdit failed:', err);
+    if (String(err.message).includes('Nicht eingeloggt') ||
+        String(err.message).includes('Nur für Admin')) {
+      alert("Admin-Session abgelaufen. Bitte oben rechts neu einloggen.");
+      isAdmin = false;
+      applyConfig();
+    } else {
+      alert("Speichern fehlgeschlagen: " + err.message);
+    }
   }
 }
 
