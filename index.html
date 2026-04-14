@@ -1627,10 +1627,16 @@ async function openPlanPopup() {
   } catch (err) {
     console.error('[Plan] ensurePlan fehlgeschlagen:', err);
   }
-  const fd = getFiltered();
+  // Popup zeigt das gewählte Jahr vollständig, nicht gefiltert durch
+  // Such-/Wildart-Filter, damit der Überblick stimmt.
+  const fullYear = daten.filter(d =>
+    d.datum && new Date(d.datum).getFullYear() === selectedYear
+  );
   try {
     document.getElementById("planPopupYear").textContent = "· Jagdjahr " + selectedYear;
-    document.getElementById("planPopupBody").innerHTML = renderPlanIstTabelle(fd, selectedYear);
+    document.getElementById("planPopupBody").innerHTML =
+      renderMonthChart(fullYear, selectedYear) +
+      renderPlanIstTabelle(fullYear, selectedYear);
   } catch (err) {
     console.error('[Plan] Popup-Rendering fehlgeschlagen:', err);
     document.getElementById("planPopupBody").innerHTML =
@@ -1638,6 +1644,75 @@ async function openPlanPopup() {
   }
   document.getElementById("planOverlay").style.display = "block";
   document.getElementById("planPopup").style.display = "block";
+}
+
+/* Jahres-Balkendiagramm: Anzahl Einträge pro Monat, gestapelt nach Wildart */
+function renderMonthChart(entries, year) {
+  const MONATE = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  const FARBEN = {
+    "Rehwild":  "#FFD600",
+    "Rotwild":  "#E53935",
+    "Gamswild": "#424242",
+    "Fuchs":    "#FF6D00",
+    "Hase":     "#795548",
+    "Andere":   "#1E88E5",
+  };
+  // Pro Monat pro Wildart zählen
+  const months = Array.from({length: 12}, () => ({}));
+  entries.forEach(d => {
+    const m = new Date(d.datum).getMonth();
+    const a = d.wildart || "Andere";
+    months[m][a] = (months[m][a] || 0) + 1;
+  });
+  const totals = months.map(m => Object.values(m).reduce((s,n) => s+n, 0));
+  const maxTotal = Math.max(1, ...totals);
+  const W = 380, H = 120, padL = 20, padB = 18, barW = (W - padL) / 12;
+
+  let html = '<div style="margin:0 0 12px;"><h4 style="margin:0 0 6px;">📈 Abschüsse pro Monat ' + year + '</h4>';
+  html += '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;background:#fafafa;border-radius:6px;">';
+
+  // Y-Gridlinien
+  for (let i = 1; i <= 4; i++) {
+    const y = (H - padB) * (1 - i/4);
+    html += `<line x1="${padL}" y1="${y}" x2="${W}" y2="${y}" stroke="#e0e0e0" stroke-width="1"/>`;
+  }
+
+  months.forEach((m, mi) => {
+    const x = padL + mi * barW + 2;
+    const total = totals[mi];
+    if (!total) {
+      html += `<text x="${x + (barW-4)/2}" y="${H - padB + 12}" font-size="9" text-anchor="middle" fill="#999">${MONATE[mi]}</text>`;
+      return;
+    }
+    let yStack = H - padB;
+    Object.keys(m).sort().forEach(art => {
+      const h = (m[art] / maxTotal) * (H - padB);
+      yStack -= h;
+      const col = FARBEN[art] || FARBEN["Andere"];
+      html += `<rect x="${x}" y="${yStack}" width="${barW - 4}" height="${h}" fill="${col}">
+                 <title>${esc(art)}: ${m[art]}</title>
+               </rect>`;
+    });
+    // Summen-Label über dem Balken
+    html += `<text x="${x + (barW-4)/2}" y="${H - padB - (total/maxTotal)*(H-padB) - 2}"
+             font-size="9" text-anchor="middle" fill="#333" font-weight="bold">${total}</text>`;
+    html += `<text x="${x + (barW-4)/2}" y="${H - padB + 12}" font-size="9" text-anchor="middle" fill="#555">${MONATE[mi]}</text>`;
+  });
+
+  html += '</svg>';
+
+  // Legende
+  const wildarten = new Set();
+  entries.forEach(d => wildarten.add(d.wildart || "Andere"));
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin-top:4px;">';
+  [...wildarten].sort().forEach(a => {
+    const col = FARBEN[a] || FARBEN["Andere"];
+    html += `<span style="display:inline-flex;align-items:center;gap:4px;">
+               <i style="display:inline-block;width:10px;height:10px;background:${col};border-radius:2px;"></i>${esc(a)}
+             </span>`;
+  });
+  html += '</div></div>';
+  return html;
 }
 
 function closePlanPopup() {
