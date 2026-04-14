@@ -423,6 +423,63 @@ tr:hover { background: var(--gruen-l); }
 
 .hint { font-size: 12px; color: #555; margin: 6px 0; }
 
+/* Bottom-Navigation (mobil-first, auch auf Desktop sichtbar) */
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 600px;
+  background: rgba(255,255,255,0.97);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.18);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 6px 8px 8px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 900;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  gap: 2px;
+}
+.bottom-nav button {
+  flex: 1 1 auto;
+  background: transparent;
+  color: var(--grau);
+  margin: 0;
+  padding: 6px 2px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  border: none;
+  border-radius: 8px;
+  min-width: 0;
+}
+.bottom-nav button:hover { background: #e8f5e9; }
+.bottom-nav button.active { color: var(--gruen-d); background: #e8f5e9; }
+.bottom-nav .bn-icon { font-size: 22px; line-height: 1; }
+.bottom-nav .bn-lbl { white-space: nowrap; }
+.bottom-nav .bn-fab {
+  flex: 0 0 auto;
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  background: var(--gruen) !important;
+  color: #fff !important;
+  font-size: 30px !important;
+  box-shadow: 0 4px 14px rgba(46,125,50,0.45);
+  transform: translateY(-16px);
+  padding: 0;
+  flex-direction: row;
+  justify-content: center;
+}
+.bottom-nav .bn-fab:hover { background: var(--gruen-d) !important; }
+
+/* Platz für Bottom-Nav schaffen, damit der letzte Inhalt nicht darunter verschwindet */
+body.has-bottom-nav .container { padding-bottom: 90px; }
+
 /* Toast-Benachrichtigungen */
 .toast-box {
   position: fixed;
@@ -573,6 +630,16 @@ tr:hover { background: var(--gruen-l); }
 .meld-table td:first-child { text-align: left; }
 .meld-table td:last-child { text-align: right; }
 
+/* Revier-Header (kompakter Titel im Revier- und Park-Modus) */
+.revier-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px;
+}
+.revier-header h2 {
+  margin: 0; font-size: 18px; color: var(--gruen-d);
+}
+.revier-header h2 span { color: var(--grau); font-weight: normal; font-size: 15px; }
+
 /* Hervorhebung gemeldeter Einträge */
 .row-gemeldet td { background: #fff8e1 !important; }
 .card-gemeldet { background: #fff8e1; border-left: 4px solid #c62828; }
@@ -585,6 +652,25 @@ tr:hover { background: var(--gruen-l); }
 
 <!-- Toast-Container für Erfolgsmeldungen -->
 <div id="toastBox" class="toast-box"></div>
+
+<!-- Mobile Bottom-Navigation -->
+<nav id="bottomNav" class="bottom-nav" style="display:none;">
+  <button data-page="start" onclick="bnGo('start')">
+    <span class="bn-icon">🏠</span><span class="bn-lbl">Start</span>
+  </button>
+  <button data-page="revier" onclick="bnGo('revier')">
+    <span class="bn-icon">🎯</span><span class="bn-lbl">Revier</span>
+  </button>
+  <button class="bn-fab" onclick="bnNewEntry()" title="Neuer Eintrag">
+    <span class="bn-icon">➕</span>
+  </button>
+  <button data-page="park" onclick="bnGo('park')">
+    <span class="bn-icon">🌲</span><span class="bn-lbl">Park</span>
+  </button>
+  <button onclick="bnMore()">
+    <span class="bn-icon">⋯</span><span class="bn-lbl">Mehr</span>
+  </button>
+</nav>
 
 <div class="container">
 
@@ -608,10 +694,8 @@ tr:hover { background: var(--gruen-l); }
 
 <!-- REVIER -->
 <div id="revier" class="page">
-  <div class="header">
-    <img src="logo.jpg"
-         alt="" style="width:60px;" onerror="this.style.display='none'">
-    <h2 id="revierTitle">Jagdrevier Prad</h2>
+  <div class="revier-header">
+    <h2 id="revierTitle">🎯 Revier · <span id="revierHeaderYear"></span></h2>
     <div id="adminIndicator" style="display:none;">
       <span class="admin-badge">ADMIN</span>
       <span style="font-size:11px;color:var(--grau);cursor:pointer;margin-left:6px;" onclick="adminLogout()">abmelden</span>
@@ -620,13 +704,13 @@ tr:hover { background: var(--gruen-l); }
   <div id="yearTabsContainer" class="year-tabs"></div>
   <div id="statsContainer" class="stats"></div>
   <div class="topbar">
-    <button onclick="neuerEintrag()">➕ Neuer Eintrag</button>
     <button onclick="openMapAll()">🗺️ Karte</button>
     <button id="btnPlan" onclick="openPlanPopup()">📋 Plan</button>
-    <button class="sec" onclick="zeigeSeite('start')">⬅ Zurück</button>
+    <button class="sec" onclick="toggleSuche()" id="btnSucheToggle">🔍</button>
   </div>
   <input id="sucheInput" type="search" placeholder="🔍 Suche: Name, Wildart, Ort…"
-         oninput="onSucheChange()" autocomplete="off" style="margin:6px 0;">
+         oninput="onSucheChange()" autocomplete="off"
+         style="margin:6px 0;display:none;">
   <div class="table-wrapper"><table id="tabelle"></table></div>
   <div class="cards" id="cardsContainer"></div>
 </div>
@@ -1351,6 +1435,7 @@ async function init() {
   // Offline-Banner anzeigen + versuchen, Outbox zu leeren
   updateOfflineBanner();
   flushOutbox();
+  updateBottomNav();
 }
 
 function applyConfig() {
@@ -1361,7 +1446,8 @@ function applyConfig() {
 
   // Header texts
   document.querySelectorAll('.header h2')[0].innerHTML = 'Abschussliste<br>' + esc(config.revier);
-  document.getElementById("revierTitle").textContent = config.revier;
+  // revierTitle wird von updateRevierHeader() verwaltet
+  if (typeof updateRevierHeader === "function") updateRevierHeader();
   document.querySelector('.header .code').textContent = 'Zahlencode: ' + config.code;
 
   // Admin indicator
@@ -1415,6 +1501,7 @@ function zeigeSeite(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   const el = document.getElementById(id);
   if (el) el.classList.add("active");
+  if (typeof updateBottomNav === "function") updateBottomNav();
 }
 
 /* ---------- Year ---------- */
@@ -1435,6 +1522,7 @@ function updateYearTabs() {
     s.onclick = async () => {
       selectedYear = y;
       updateYearTabs();
+      updateRevierHeader();
       await ensurePlan(y);
       anzeigen();
     };
@@ -1459,20 +1547,38 @@ function matchesSearch(d, q) {
 async function openRevierMode(mode) {
   appMode = (mode === "park") ? "park" : "revier";
   statsFilter = "";
-  const titleEl = document.getElementById("revierTitle");
-  if (titleEl) {
-    titleEl.textContent = appMode === "park"
-      ? "🌲 Park – " + (config.revier || "Jagdrevier Prad")
-      : (config.revier || "Jagdrevier Prad");
-  }
-  // Such-Input zurücksetzen
+  updateRevierHeader();
+  // Such-Input zurücksetzen und ausblenden
   const sEl = document.getElementById("sucheInput");
-  if (sEl) sEl.value = "";
+  if (sEl) { sEl.value = ""; sEl.style.display = "none"; }
   sucheText = "";
   await ensurePlan(selectedYear);
   updateYearTabs();
   anzeigen();
   zeigeSeite("revier");
+}
+
+function updateRevierHeader() {
+  const titleEl = document.getElementById("revierTitle");
+  const yearEl  = document.getElementById("revierHeaderYear");
+  if (!titleEl) return;
+  const prefix = appMode === "park" ? "🌲 Park" : "🎯 Revier";
+  titleEl.innerHTML = prefix + ' · <span id="revierHeaderYear">'
+                    + selectedYear + '</span>';
+}
+
+function toggleSuche() {
+  const s = document.getElementById("sucheInput");
+  if (!s) return;
+  if (s.style.display === "none" || s.style.display === "") {
+    s.style.display = "block";
+    s.focus();
+  } else {
+    s.style.display = "none";
+    s.value = "";
+    sucheText = "";
+    anzeigen();
+  }
 }
 
 function getFiltered() {
@@ -2903,6 +3009,104 @@ function toggleCardExpand(cardEl) {
   // Nur kompakt-Karten sind klappbar
   if (!cardEl.classList.contains("card-compact")) return;
   cardEl.classList.toggle("expanded");
+}
+
+/* ---------- Bottom-Navigation ---------- */
+function bnGo(where) {
+  if (where === "start") {
+    zeigeSeite("start");
+  } else if (where === "revier") {
+    openRevierMode("revier");
+  } else if (where === "park") {
+    openRevierMode("park");
+  }
+  updateBottomNav();
+}
+
+function bnNewEntry() {
+  // Wenn wir nicht in Revier/Park sind, zuerst dorthin wechseln und
+  // dann den neuen Eintrag starten. Wenn bereits dort: direkt neuer Eintrag.
+  const startNew = () => { neuerEintrag(); };
+  const currentPage = document.querySelector(".page.active");
+  const pageId = currentPage ? currentPage.id : "";
+  if (pageId === "revier") {
+    startNew();
+  } else {
+    // Default: in den aktuellen appMode (oder Revier) wechseln
+    openRevierMode(appMode || "revier").then(startNew).catch(startNew);
+  }
+}
+
+function bnMore() {
+  const ov = document.createElement("div");
+  ov.style.cssText =
+    "position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;display:block;";
+  const box = document.createElement("div");
+  box.style.cssText =
+    "position:fixed;left:50%;bottom:100px;transform:translateX(-50%);" +
+    "background:#fff;padding:14px;border-radius:14px;" +
+    "box-shadow:0 10px 40px rgba(0,0,0,0.35);" +
+    "z-index:1000;display:flex;flex-direction:column;gap:6px;" +
+    "min-width:260px;max-width:92%;";
+  const close = () => { ov.remove(); box.remove(); };
+  ov.onclick = close;
+  box.onclick = ev => ev.stopPropagation();
+  const items = [];
+  items.push({ icon: "🗺", label: "Karte", action: () => { close(); openMapAll(); } });
+  if (config.planVisible !== false || isAdmin) {
+    items.push({ icon: "📋", label: "Plan", action: () => { close(); openPlanPopup(); } });
+  }
+  items.push({ icon: "❓", label: "Hilfe", action: () => { close(); openHelp(); } });
+  if (isAdmin) {
+    items.push({ icon: "⚙️", label: "Admin-Einstellungen", action: () => { close(); showLogin(); } });
+    items.push({ icon: "🔓", label: "Admin abmelden", action: () => { close(); adminLogoutFull(); } });
+  } else {
+    items.push({ icon: "🔐", label: "Admin-Login", action: () => { close(); showLogin(); } });
+  }
+  box.innerHTML = '<div style="font-size:13px;color:#666;margin-bottom:4px;text-align:center;">Mehr Aktionen</div>';
+  items.forEach(it => {
+    const b = document.createElement("button");
+    b.className = "sec";
+    b.style.cssText = "text-align:left;margin:0;display:flex;align-items:center;gap:10px;";
+    b.innerHTML = `<span style="font-size:20px;width:28px;text-align:center;">${it.icon}</span>${esc(it.label)}`;
+    b.onclick = it.action;
+    box.appendChild(b);
+  });
+  document.body.appendChild(ov);
+  document.body.appendChild(box);
+}
+
+/* Aktualisiert den aktiven Button der Bottom-Nav basierend auf
+   der aktuellen Seite + appMode. Blendet die Bottom-Nav während
+   des Workflow-Schritts aus (damit der FAB nicht mit dem Weiter-
+   Button konkurriert). */
+function updateBottomNav() {
+  const nav = document.getElementById("bottomNav");
+  if (!nav) return;
+  const currentPage = document.querySelector(".page.active");
+  const pageId = currentPage ? currentPage.id : "";
+  // Während des Workflows oder im Admin-Login die Bottom-Nav ausblenden
+  const hideOn = ["admin-login"];
+  const isWorkflow = pageId.startsWith("wf-");
+  const hidden = isWorkflow || hideOn.includes(pageId);
+  nav.style.display = hidden ? "none" : "flex";
+  document.body.classList.toggle("has-bottom-nav", !hidden);
+
+  // Aktiven Button markieren
+  nav.querySelectorAll("button[data-page]").forEach(btn => {
+    const p = btn.dataset.page;
+    let active = false;
+    if (p === "start")  active = (pageId === "start");
+    if (p === "revier") active = (pageId === "revier" && appMode !== "park");
+    if (p === "park")   active = (pageId === "revier" && appMode === "park");
+    btn.classList.toggle("active", active);
+  });
+  // Park-Button versteckt halten, wenn Admin ihn so konfiguriert hat
+  const parkBtn = nav.querySelector('button[data-page="park"]');
+  if (parkBtn) {
+    const parkVisible = (config.parkVisible !== false) || isAdmin;
+    parkBtn.style.display = parkVisible ? "" : "none";
+  }
 }
 
 function adminTab(id) {
