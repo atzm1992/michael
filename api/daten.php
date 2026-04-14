@@ -23,7 +23,7 @@ $pdo = db();
 /* Felder, die aus einem Eintrag-Body übernommen werden */
 $ALLOWED = ['name','wildart','wild','gewicht','ort',
             'koord_x','koord_y','koord_lat','koord_lng',
-            'zeit','datum','verwendung','entnommen','abfall','gemeldet','wetter','ist_park'];
+            'zeit','datum','verwendung','entnommen','abfall','gemeldet','wetter','ist_park','ist_fallwild'];
 
 function fromRequest(array $src, array $allowed): array {
     $out = [];
@@ -47,9 +47,10 @@ function loadEntry(PDO $pdo, int $id): ?array {
     $row = $s->fetch();
     if (!$row) return null;
     // Typen erzwingen, damit JSON garantiert Zahlen statt Strings liefert
-    $row['id']       = (int) $row['id'];
-    $row['gemeldet'] = (int) $row['gemeldet'];
-    $row['ist_park'] = (int) ($row['ist_park'] ?? 0);
+    $row['id']           = (int) $row['id'];
+    $row['gemeldet']     = (int) $row['gemeldet'];
+    $row['ist_park']     = (int) ($row['ist_park'] ?? 0);
+    $row['ist_fallwild'] = (int) ($row['ist_fallwild'] ?? 0);
     if ($row['gewicht'] !== null) $row['gewicht'] = (int) $row['gewicht'];
     if ($row['jahr']    !== null) $row['jahr']    = (int) $row['jahr'];
     return $row;
@@ -71,9 +72,10 @@ if ($method === 'GET') {
     $rows = $s->fetchAll();
     // Typen hart setzen (s. loadEntry)
     foreach ($rows as &$r) {
-        $r['id']       = (int) $r['id'];
-        $r['gemeldet'] = (int) $r['gemeldet'];
-        $r['ist_park'] = (int) ($r['ist_park'] ?? 0);
+        $r['id']           = (int) $r['id'];
+        $r['gemeldet']     = (int) $r['gemeldet'];
+        $r['ist_park']     = (int) ($r['ist_park'] ?? 0);
+        $r['ist_fallwild'] = (int) ($r['ist_fallwild'] ?? 0);
         if ($r['gewicht'] !== null) $r['gewicht'] = (int) $r['gewicht'];
         if ($r['jahr']    !== null) $r['jahr']    = (int) $r['jahr'];
     }

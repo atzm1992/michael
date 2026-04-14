@@ -115,9 +115,10 @@ function ensureSchema(): void {
           verwendung  VARCHAR(30),
           entnommen   DATE NULL,
           abfall      VARCHAR(10) NULL,
-          gemeldet    TINYINT(1) NOT NULL DEFAULT 0,
-          ist_park    TINYINT(1) NOT NULL DEFAULT 0,
-          jahr        INT GENERATED ALWAYS AS (YEAR(datum)) STORED,
+          gemeldet     TINYINT(1) NOT NULL DEFAULT 0,
+          ist_park     TINYINT(1) NOT NULL DEFAULT 0,
+          ist_fallwild TINYINT(1) NOT NULL DEFAULT 0,
+          jahr         INT GENERATED ALWAYS AS (YEAR(datum)) STORED,
           created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           INDEX idx_jahr (jahr),
@@ -134,6 +135,9 @@ function ensureSchema(): void {
     catch (PDOException $e) { /* column existiert bereits */ }
     // Park-Feature: unterscheidet Revier- und Park-Einträge
     try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN ist_park TINYINT(1) NOT NULL DEFAULT 0"); }
+    catch (PDOException $e) { /* column existiert bereits */ }
+    // Fallwild-Feature: wird NICHT im Abschussplan gezählt
+    try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN ist_fallwild TINYINT(1) NOT NULL DEFAULT 0"); }
     catch (PDOException $e) { /* column existiert bereits */ }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS abschussplan (

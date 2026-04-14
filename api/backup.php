@@ -64,7 +64,7 @@ if ($method === 'POST') {
         // Einträge wieder einspielen
         $cols = ['id','name','wildart','wild','gewicht','ort',
                  'koord_x','koord_y','koord_lat','koord_lng','wetter',
-                 'zeit','datum','verwendung','entnommen','abfall','gemeldet','ist_park'];
+                 'zeit','datum','verwendung','entnommen','abfall','gemeldet','ist_park','ist_fallwild'];
         $sql  = 'INSERT INTO eintraege (' . implode(',', $cols) . ') VALUES (:'
               . implode(', :', $cols) . ')';
         $stmt = $pdo->prepare($sql);

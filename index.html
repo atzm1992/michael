@@ -581,6 +581,9 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 .stat-box:active { transform: scale(0.97); }
 .stat-box.active { background: var(--gruen); border-color: var(--gruen-d); }
 .stat-box.active .num, .stat-box.active .lbl { color: #fff; }
+.stat-box.stat-fallwild { background: #ffe0e0; }
+.stat-box.stat-fallwild .num { color: #b71c1c; }
+.stat-box.stat-fallwild.active { background: #b71c1c; border-color: #b71c1c; }
 .stat-box .num { font-size: 1.5em; font-weight: bold; color: var(--gruen-d); }
 .stat-box .lbl { font-size: 11px; color: var(--grau); }
 
@@ -1275,10 +1278,11 @@ function dbToClient(row) {
     datum:      row.datum || "",
     verwendung: row.verwendung || "",
     entnommen:  row.entnommen || "",
-    abfall:     row.abfall,
-    gemeldet:   !!row.gemeldet,
-    ist_park:   !!row.ist_park,
-    wetter:     row.wetter || "",
+    abfall:       row.abfall,
+    gemeldet:     !!row.gemeldet,
+    ist_park:     !!row.ist_park,
+    ist_fallwild: !!row.ist_fallwild,
+    wetter:       row.wetter || "",
   };
 }
 function clientToDb(ev) {
@@ -1294,10 +1298,11 @@ function clientToDb(ev) {
     datum:      ev.datum,
     verwendung: ev.verwendung,
     entnommen:  ev.entnommen || null,
-    abfall:     ev.abfall,
-    gemeldet:   ev.gemeldet ? 1 : 0,
-    ist_park:   ev.ist_park ? 1 : 0,
-    wetter:     ev.wetter || null,
+    abfall:       ev.abfall,
+    gemeldet:     ev.gemeldet ? 1 : 0,
+    ist_park:     ev.ist_park ? 1 : 0,
+    ist_fallwild: ev.ist_fallwild ? 1 : 0,
+    wetter:       ev.wetter || null,
   };
 }
 
@@ -1583,14 +1588,22 @@ function toggleSuche() {
 
 function getFiltered() {
   const isPark = (appMode === "park");
-  const list = daten.filter(d =>
-    d.datum &&
-    new Date(d.datum).getFullYear() === selectedYear &&
-    (!!d.ist_park === isPark) &&
-    (!statsFilter || (d.wildart || "Andere") === statsFilter ||
-     (d.wild || "–") === statsFilter) &&
-    matchesSearch(d, sucheText)
-  );
+  const list = daten.filter(d => {
+    if (!d.datum) return false;
+    if (new Date(d.datum).getFullYear() !== selectedYear) return false;
+    if (!!d.ist_park !== isPark) return false;
+    // Stats-Filter: __fallwild__ zeigt nur Fallwild-Einträge,
+    // andere Filter-Werte zeigen die gewählte Wildart/Klasse (ohne Fallwild).
+    if (statsFilter === "__fallwild__") {
+      if (!d.ist_fallwild) return false;
+    } else if (statsFilter) {
+      if (d.ist_fallwild) return false;
+      if ((d.wildart || "Andere") !== statsFilter &&
+          (d.wild || "–") !== statsFilter) return false;
+    }
+    if (!matchesSearch(d, sucheText)) return false;
+    return true;
+  });
   // Chronologisch: neueste zuerst, bei gleichem Datum nach Schusszeit,
   // bei gleicher Zeit nach id (Tie-Breaker).
   list.sort((a, b) => {
@@ -1650,9 +1663,12 @@ function updateStats() {
     new Date(d.datum).getFullYear() === selectedYear &&
     (!!d.ist_park === isPark)
   );
-  // Im Park gruppieren wir nach Klasse (T-Hirsch ...), im Revier nach Wildart
+  // Im Park gruppieren wir nach Klasse (T-Hirsch ...), im Revier nach Wildart.
+  // Fallwild wird zusätzlich als eigene Kategorie gezählt.
   const counts = {};
+  let fallCount = 0;
   fdAll.forEach(d => {
+    if (d.ist_fallwild) { fallCount++; return; }
     const k = isPark ? (d.wild || "–") : (d.wildart || "Andere");
     counts[k] = (counts[k] || 0) + 1;
   });
@@ -1668,6 +1684,12 @@ function updateStats() {
             <div class="num">${counts[k]}</div><div class="lbl">${esc(k)}</div>
           </div>`;
   });
+  if (fallCount > 0) {
+    const cls = "stat-box stat-fallwild" + (active === "__fallwild__" ? " active" : "");
+    h += `<div class="${cls}" onclick="setStatsFilter('__fallwild__')" title="Nur Fallwild">
+            <div class="num">${fallCount}</div><div class="lbl">☠ Fallwild</div>
+          </div>`;
+  }
   document.getElementById("statsContainer").innerHTML = h;
 }
 
@@ -1906,9 +1928,11 @@ function renderPlanIstTabelle(fd, year) {
   try {
     const plan = getPlan(year) || {};
 
-    // Pro Wildart Ist-Werte pro Wild-Klasse grob vorzählen
+    // Pro Wildart Ist-Werte pro Wild-Klasse grob vorzählen.
+    // Fallwild wird NICHT im Plan gezählt – so gewollt.
     const raw = {};
     fd.forEach(d => {
+      if (d.ist_fallwild) return;  // Fallwild überspringen
       const a = d.wildart || "";
       if (!raw[a]) raw[a] = {};
       const k = d.wild || "–";
@@ -2680,7 +2704,8 @@ function anzeigen() {
     const ri = realIdx(fi);
     const r = t.insertRow();
     if (d.gemeldet) r.classList.add("row-gemeldet");
-    r.insertCell().innerText = (d.gemeldet ? "🔒 " : "") + (d.name||"");
+    r.insertCell().innerText =
+      (d.gemeldet ? "🔒 " : "") + (d.ist_fallwild ? "☠ " : "") + (d.name||"");
     r.insertCell().innerText = d.wildart||"";
     r.insertCell().innerText = d.wild||"";
     r.insertCell().innerText = d.gewicht||"";
@@ -2727,7 +2752,7 @@ function anzeigen() {
     const card = document.createElement("div");
     card.className = "card" + (d.gemeldet ? " card-gemeldet" : "") + (compact ? " card-compact" : "");
     card.dataset.id = ri;
-    const wt = (d.gemeldet ? "🔒 " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
+    const wt = (d.gemeldet ? "🔒 " : "") + (d.ist_fallwild ? "☠ " : "") + d.wildart + (d.wild ? " – "+d.wild : "");
     const ortH = d.latlng
       ? `<span class="link" onclick="event.stopPropagation();openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`
       : esc(d.ort||"");
@@ -2942,6 +2967,13 @@ function openEdit(id) {
         🔒 als gemeldet sperren
       </label>
     </div>
+    <div class="edit-row">
+      <label>Fallwild</label>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-weight:normal;">
+        <input id="ed_fall" type="checkbox" ${d.ist_fallwild ? "checked" : ""} style="width:auto;margin:0;">
+        ☠ als Fallwild markieren (wird nicht im Abschussplan gezählt)
+      </label>
+    </div>
     <div style="margin-top:12px;display:flex;gap:8px;">
       <button onclick="saveEdit(${id})" style="flex:1;">💾 Speichern</button>
       <button class="sec" onclick="closePopups()" style="flex:1;">Abbrechen</button>
@@ -2962,8 +2994,9 @@ async function saveEdit(id) {
     datum:      document.getElementById("ed_datum").value,
     entnommen:  document.getElementById("ed_ent").value || null,
     verwendung: document.getElementById("ed_verw").value,
-    abfall:     a === "" ? null : a,
-    gemeldet:   document.getElementById("ed_gem").checked ? 1 : 0,
+    abfall:       a === "" ? null : a,
+    gemeldet:     document.getElementById("ed_gem").checked ? 1 : 0,
+    ist_fallwild: document.getElementById("ed_fall").checked ? 1 : 0,
   };
   console.log('[Edit] saveEdit id=', id, 'body=', body);
   try {
