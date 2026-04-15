@@ -462,23 +462,33 @@ tr:hover { background: var(--gruen-l); }
 .bottom-nav button.active { color: var(--gruen-d); background: #e8f5e9; }
 .bottom-nav .bn-icon { font-size: 22px; line-height: 1; }
 .bottom-nav .bn-lbl { white-space: nowrap; }
-.bottom-nav .bn-fab {
-  flex: 0 0 auto;
-  width: 58px; height: 58px;
+/* Floating Action Button (Neuer Eintrag).
+   Schwebt rechts unten direkt über der Bottom-Nav. */
+.floating-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 80px;  /* über der Bottom-Nav */
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
   background: var(--gruen) !important;
   color: #fff !important;
-  font-size: 30px !important;
-  box-shadow: 0 4px 14px rgba(46,125,50,0.45);
-  transform: translateY(-16px);
+  font-size: 32px !important;
+  line-height: 62px;
+  text-align: center;
   padding: 0;
-  flex-direction: row;
-  justify-content: center;
+  border: none;
+  box-shadow: 0 6px 18px rgba(46,125,50,0.45);
+  z-index: 920;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s;
 }
-.bottom-nav .bn-fab:hover { background: var(--gruen-d) !important; }
-/* FAB wird per JS nur in Revier/Park eingeblendet. Hier eine defensive
-   Regel, falls irgendwo eine andere CSS-Kaskade reinfunkt. */
-.bottom-nav.no-fab .bn-fab { display: none !important; }
+.floating-fab:hover {
+  background: var(--gruen-d) !important;
+  box-shadow: 0 8px 24px rgba(46,125,50,0.55);
+}
+.floating-fab:active { transform: scale(0.95); }
 
 /* Platz für Bottom-Nav schaffen, damit der letzte Inhalt nicht darunter verschwindet */
 body.has-bottom-nav .container { padding-bottom: 90px; }
@@ -636,6 +646,41 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 .meld-table td:first-child { text-align: left; }
 .meld-table td:last-child { text-align: right; }
 
+/* Hilfe-Popup: kompakte Accordion-Struktur */
+.help-sections details.help-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: #fafafa;
+}
+.help-sections details.help-section > summary {
+  list-style: none;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+}
+.help-sections details.help-section > summary::-webkit-details-marker { display: none; }
+.help-sections details.help-section > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--grau);
+  transition: transform 0.15s;
+}
+.help-sections details.help-section[open] > summary::before { transform: rotate(90deg); }
+.help-sections .help-body {
+  padding: 2px 14px 12px 28px;
+  font-size: 13px;
+  color: #333;
+  line-height: 1.45;
+}
+.help-sections .help-body ul,
+.help-sections .help-body ol { padding-left: 18px; margin: 6px 0; }
+.help-sections .help-body code {
+  background: #eceff1; padding: 1px 5px; border-radius: 3px; font-size: 12px;
+}
+
 /* Revier-Header (kompakter Titel im Revier- und Park-Modus) */
 .revier-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -667,9 +712,6 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   <button data-page="revier" onclick="bnGo('revier')">
     <span class="bn-icon">🎯</span><span class="bn-lbl">Revier</span>
   </button>
-  <button class="bn-fab" onclick="bnNewEntry()" title="Neuer Eintrag" style="display:none;">
-    <span class="bn-icon">➕</span>
-  </button>
   <button data-page="park" onclick="bnGo('park')">
     <span class="bn-icon">🌲</span><span class="bn-lbl">Park</span>
   </button>
@@ -677,6 +719,11 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     <span class="bn-icon">⋯</span><span class="bn-lbl">Mehr</span>
   </button>
 </nav>
+
+<!-- Floating Action Button (Neuer Eintrag) - schwebt rechts unten
+     über der Bottom-Nav. Nur in Revier/Park sichtbar. -->
+<button id="floatingFab" class="floating-fab" onclick="bnNewEntry()"
+        title="Neuer Eintrag" style="display:none;">➕</button>
 
 <div class="container">
 
@@ -794,6 +841,8 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   <h3>⚖️ Gewicht (kg)</h3>
   <select id="inputGewicht"></select>
   <button onclick="nextOrt()">Weiter ➡</button>
+  <button class="sec" onclick="skipGewicht()" style="background:#757575;">⏭ Später eintragen</button>
+  <p class="hint">Bei „Später eintragen" kannst du das Gewicht einmal nach dem Speichern direkt im Eintrag nachtragen.</p>
   <button class="sec" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
   <button class="sec" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
@@ -1154,19 +1203,58 @@ async function flushOutbox() {
   updateOfflineBanner();
 }
 
-/* ---------- Kosmetische Client-Konfiguration (bleibt lokal) ---------- */
+/* ---------- Kosmetische Client-Konfiguration ---------- */
+/* Wird beim Start aus der DB geladen (api/config.php) und nach
+   Änderung dort gespeichert. localStorage dient nur als Offline-
+   Fallback-Cache, damit die Seite auch ohne Netz sinnvoll startet. */
 let config = JSON.parse(localStorage.getItem("cfg") || '{}');
 // One-time-Migration: alter Name "Jagdverein Prad" → "Jagdrevier Prad"
 if (config.revier === "Jagdverein Prad") {
   config.revier = "Jagdrevier Prad";
   localStorage.setItem("cfg", JSON.stringify(config));
 }
-if (!config.revier) config.revier = "Jagdrevier Prad";
-if (!config.code) config.code = "1024";
-if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
-if (typeof config.planVisible === "undefined") config.planVisible = true;
-if (typeof config.cardsCompact === "undefined") config.cardsCompact = true;
-if (typeof config.parkVisible === "undefined") config.parkVisible = true;
+applyConfigDefaults(config);
+
+function applyConfigDefaults(c) {
+  if (!c.revier) c.revier = "Jagdrevier Prad";
+  if (!c.code) c.code = "1024";
+  if (!c.abfallText) c.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
+  if (typeof c.planVisible  === "undefined") c.planVisible  = true;
+  if (typeof c.cardsCompact === "undefined") c.cardsCompact = true;
+  if (typeof c.parkVisible  === "undefined") c.parkVisible  = true;
+}
+
+/* Typen-Fix: aus der DB kommen alle Werte als String.
+   Wir konvertieren Booleans wieder zurück. */
+function coerceConfig(raw) {
+  const BOOL_KEYS = ["planVisible", "cardsCompact", "parkVisible"];
+  const out = {};
+  for (const k of Object.keys(raw || {})) {
+    let v = raw[k];
+    if (BOOL_KEYS.includes(k)) {
+      v = (v === "1" || v === "true" || v === true);
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
+/* Lädt die Config vom Server und merged sie in die lokale Variable. */
+async function loadRemoteConfig() {
+  try {
+    const remote = await api.getConfig();
+    const coerced = coerceConfig(remote);
+    // Merge: Server-Werte überschreiben lokale Defaults, lokale Werte
+    // bleiben für Felder, die der Server (noch) nicht hat.
+    Object.assign(config, coerced);
+    applyConfigDefaults(config);
+    // Auch lokal cachen für den nächsten Offline-Start.
+    try { localStorage.setItem("cfg", JSON.stringify(config)); } catch (_) {}
+  } catch (err) {
+    // Kein Netz / Server weg → wir bleiben bei den lokalen Werten.
+    console.warn("[config] Konnte Server-Config nicht laden:", err);
+  }
+}
 
 /* ---------- Echte Daten: werden aus der API geladen ---------- */
 let daten = [];                 // alle Einträge (aus api/daten.php)
@@ -1176,6 +1264,7 @@ let aktuellerPunkt = null;
 let mapMode = "input";
 let viewIndex = null;
 let singleViewEntry = null;   // beim Single-View per Tabellenklick gesetzt
+let editLocationId  = null;   // beim Edit-Location-Modus: welche id wird bearbeitet
 let selectedYear = new Date().getFullYear();
 let statsFilter = "";         // Filter per Klick auf eine Stat-Kachel
 let appMode = "revier";       // "revier" oder "park" - steuert die Liste
@@ -1244,6 +1333,13 @@ const api = {
     return this.req('api/auth.php', {
       method: 'POST',
       body: JSON.stringify({ action: 'change_pw', old: oldPw, new: newPw }),
+    });
+  },
+  getConfig() { return this.req('api/settings.php'); },
+  saveConfig(values) {
+    return this.req('api/settings.php', {
+      method: 'POST',
+      body: JSON.stringify({ values }),
     });
   },
 };
@@ -1426,6 +1522,11 @@ async function init() {
     isAdmin = a && a.rolle === 'admin';
     currentUser = (a && a.logged_in) ? a.username : null;
   } catch (_) { isAdmin = false; currentUser = null; }
+
+  // Server-Config laden (überschreibt den lokalen Cache). Die Werte
+  // gelten für alle Geräte, werden aber lokal gecached, damit die
+  // Seite offline startet.
+  await loadRemoteConfig();
 
   // Daten laden
   await reloadDaten();
@@ -1701,120 +1802,199 @@ function openHelp() {
   box.style.cssText =
     "position:fixed;left:4%;right:4%;top:3vh;" +
     "max-height:94vh;overflow-y:auto;" +
-    "background:#fff;padding:18px;border-radius:12px;" +
+    "background:#fff;padding:16px 18px;border-radius:12px;" +
     "box-shadow:0 10px 40px rgba(0,0,0,0.4);" +
     "z-index:1000;display:block;" +
     "-webkit-overflow-scrolling:touch;";
   ov.onclick = () => { ov.remove(); box.remove(); };
   box.onclick = ev => ev.stopPropagation();
-  box.innerHTML = `
-    <h3>❓ Hilfe – Jagdrevier Prad</h3>
 
-    <h4>🎯 Neuen Eintrag anlegen</h4>
-    <p>Im Revier-Tab auf <b>➕ Neuer Eintrag</b>. Du gehst der Reihe nach
-    durch: Erleger → Wildart → Klasse → Gewicht → Ort → Zeit → Datum →
-    Verwendung → Zusammenfassung → Speichern. Datum und Uhrzeit sind immer
-    auf „jetzt" vorausgefüllt, du musst sie nur ändern, wenn nötig.</p>
+  const parkOn  = (config.parkVisible  !== false) || isAdmin;
+  const planOn  = (config.planVisible  !== false) || isAdmin;
 
-    <h4>📍 Ort setzen</h4>
-    <p>Drei Wege:</p>
-    <ul>
-      <li><b>📡 Jetzt hier</b>: per GPS deinen aktuellen Standort übernehmen
-          (funktioniert nur draußen mit Empfang und HTTPS).</li>
-      <li><b>🗺️ Karte öffnen</b>: Karte anzeigen, auf den Erlegungsort tippen,
-          OK.</li>
-      <li><b>Andere</b>: Ortsname frei eingeben, wenn es nicht in Prad war.</li>
-    </ul>
+  /* Jeder Abschnitt ist ein Objekt mit:
+       - key: eindeutiger Identifier
+       - icon, title
+       - content: HTML
+       - adminOnly: nur für Admin sichtbar
+       - show: optional, explizite Sichtbarkeits-Funktion */
+  const sections = [
+    {
+      icon: "🎯", title: "Neuen Eintrag anlegen",
+      content:
+        "Tippe auf den grünen <b>➕</b>-Button rechts unten in der Revier- " +
+        "oder Park-Liste. Du gehst der Reihe nach durch die Schritte: " +
+        "Erleger → Wildart → Klasse → Gewicht → Ort → Zeit → Datum → " +
+        "Verwendung → Zusammenfassung → Speichern. Datum und Uhrzeit " +
+        "sind auf &bdquo;jetzt&rdquo; vorausgefüllt."
+    },
+    {
+      icon: "📍", title: "Ort setzen",
+      content:
+        "<ul><li><b>📡 Jetzt hier</b> – per GPS dein aktueller Standort. " +
+        "Funktioniert nur mit HTTPS und GPS-Empfang.</li>" +
+        "<li><b>🗺️ Karte öffnen</b> – auf den Erlegungsort tippen und OK.</li>" +
+        "<li><b>Andere</b> – freier Ortsname, wenn nicht in Prad.</li></ul>"
+    },
+    {
+      icon: "❄️", title: "Kühlzelle",
+      content:
+        "Auf der Startseite siehst du, wie viele Tiere aktuell eingelagert " +
+        "und noch nicht entnommen sind – gruppiert nach Wildart. " +
+        "Revier- und Park-Einträge werden zusammen gezählt."
+    },
+    {
+      icon: "📊", title: "Stat-Kacheln als Filter",
+      content:
+        "Im Revier-/Park-Tab kannst du auf die farbigen Kacheln (z.B. " +
+        "&bdquo;Rehwild 3&ldquo;) tippen – die Liste wird dann auf diese Wildart oder " +
+        "Klasse gefiltert. Nochmal tippen oder &bdquo;Gesamt&ldquo; → Filter aus."
+    },
+    {
+      icon: "🔍", title: "Suche",
+      content:
+        "In der Revier-/Park-Toolbar gibt es ein 🔍-Symbol. Ein Tap " +
+        "öffnet das Suchfeld, in dem du nach Name, Wildart, Klasse, " +
+        "Ort oder Verwendung suchen kannst."
+    },
+    {
+      icon: "🗺", title: "Karte",
+      content:
+        "Im ⋯ Mehr-Menü &bdquo;Karte&ldquo; tippen. Zeigt alle Abschüsse des aktuellen " +
+        "Jahres als farbige Punkte. Mit <b>🛰 Satellit</b> oben rechts " +
+        "schaltest du zwischen Karten- und Satellitenansicht um. Mit " +
+        "<b>📍 Mein Standort</b> springst du zu deiner aktuellen Position."
+    },
+    {
+      show: () => planOn,
+      icon: "📋", title: "Abschussplan (Popup)",
+      content:
+        "Im ⋯ Mehr-Menü &bdquo;Plan&ldquo; tippen. Zeigt das Monats-Balkendiagramm und " +
+        "die Plan/Ist/Extern/Rest-Tabelle. Rest-Formel: " +
+        "<code>Plan − Ist − Extern</code>. Fallwild wird nicht im Plan " +
+        "gezählt."
+    },
+    {
+      icon: "📴", title: "Offline-Modus",
+      content:
+        "Die App ist eine PWA: du kannst sie über das Browser-Menü als " +
+        "App auf dem Homescreen installieren. Sie funktioniert auch ohne " +
+        "Internet. Einträge ohne Empfang werden in einer Warteschlange " +
+        "gesammelt und automatisch hochgeladen, sobald das Netz wieder " +
+        "da ist. Ein orangener Banner zeigt den Offline-Status an."
+    },
+    {
+      icon: "🌡", title: "Wetter",
+      content:
+        "Wenn ein Abschuss mit GPS-Koordinaten gespeichert wird, lädt " +
+        "die App nach dem Speichern automatisch die Wetterlage zur " +
+        "Schusszeit (Temperatur, Wind, Niederschlag) nach und zeigt sie " +
+        "im Eintrag."
+    },
 
-    <h4>❄️ Kühlzelle</h4>
-    <p>Auf der Startseite siehst du, wie viele Tiere aktuell eingelagert und
-    noch nicht entnommen sind – gruppiert nach Wildart. Revier- und Park-
-    Einträge werden zusammen gezählt.</p>
+    /* -------- Admin-only Sektionen -------- */
+    {
+      adminOnly: true,
+      icon: "🔐", title: "Admin-Login",
+      content:
+        "Oben rechts der Button 🔐. Als Admin kannst du Einträge bearbeiten, " +
+        "löschen und sperren, den Abschussplan pflegen sowie drucken. " +
+        "Unter &bdquo;Passwort ändern&ldquo; kannst du dein Passwort neu setzen – das " +
+        "alte wird zur Bestätigung abgefragt."
+    },
+    {
+      adminOnly: true,
+      icon: "🔒", title: "Eintrag &bdquo;gemeldet&ldquo; sperren",
+      content:
+        "Gemeldete Einträge sind gegen Änderungen geschützt. Typischer " +
+        "Ablauf:<ol><li>Jäger trägt den Abschuss ein.</li>" +
+        "<li>Du reichst die Liste als PDF beim Jagdverband ein.</li>" +
+        "<li>Danach setzt du im Admin → Meldungen die Einträge auf 🔒, " +
+        "damit sie nicht mehr verändert werden können.</li></ol>" +
+        "Admin kann die Sperre jederzeit wieder aufheben."
+    },
+    {
+      adminOnly: true,
+      icon: "📋", title: "Abschussplan bearbeiten",
+      content:
+        "Im Admin → Plan. Kontext (🎯 Revier / 🌲 Park) wählen, Jahr " +
+        "wählen, pro Klasse: ✓ Haken = zählt, Plan = Sollzahl, Extern = " +
+        "von außerhalb angerechnete Abschüsse, &bdquo;Zählt als&ldquo; = optional " +
+        "mehrere Klassen zu einer Zeile zusammenfassen (Komma-getrennt)."
+    },
+    {
+      adminOnly: true,
+      icon: "☠", title: "Fallwild markieren",
+      content:
+        "Im Edit-Dialog eines Eintrags gibt es eine Checkbox &bdquo;als " +
+        "Fallwild markieren&ldquo;. Fallwild wird NICHT im Plan gezählt, aber " +
+        "separat in den Stats und im Monats-Chart angezeigt."
+    },
+    {
+      adminOnly: true,
+      icon: "🖨", title: "Drucken / PDF + CSV-Export",
+      content:
+        "Im Admin → Export wählst du Bereich (Revier/Park) und Jahr. " +
+        "<b>🖨 Drucken / PDF</b> erstellt eine A4-Liste für die amtliche " +
+        "Meldung. <b>📊 CSV/Excel</b> liefert eine CSV-Datei zum Öffnen " +
+        "in Excel."
+    },
+    {
+      adminOnly: true,
+      icon: "💾", title: "Backup & Restore",
+      content:
+        "Im Admin → Export → &bdquo;Backup der Datenbank&ldquo;. Das Backup ist ein " +
+        "JSON-Dump (ohne Passwörter). Beim Einspielen werden alle Daten " +
+        "überschrieben – vorher also immer ein aktuelles Backup machen."
+    },
+    {
+      adminOnly: true,
+      icon: "⚙️", title: "Einstellungen",
+      content:
+        "Im Admin → Allgemein kannst du Reviername, Zahlencode, " +
+        "Abfall-Hinweistext, Sichtbarkeit von Plan/Park-Button und " +
+        "kompakte vs. detaillierte Kartenansicht einstellen. Die " +
+        "Einstellungen liegen in der Datenbank und gelten für alle Geräte."
+    },
+  ];
 
-    <h4>📊 Statistik-Kacheln als Filter</h4>
-    <p>Im Revier-Tab kannst du auf „Rehwild 3", „Rotwild 2" usw. klicken –
-    die Tabelle zeigt dann nur diese Wildart. Nochmal klicken oder auf
-    „Gesamt" → Filter aus.</p>
+  // Filtern nach Admin-Status und Konfig
+  const visibleSections = sections.filter(s => {
+    if (s.adminOnly && !isAdmin) return false;
+    if (typeof s.show === "function" && !s.show()) return false;
+    return true;
+  });
 
-    <h4>🔒 Eintrag „gemeldet" sperren</h4>
-    <p>Gemeldete Einträge sind gegen versehentliche Änderungen geschützt.
-    Typischer Ablauf:</p>
-    <ol>
-      <li>Jäger trägt den Abschuss ein (offen, bearbeitbar).</li>
-      <li>Ende des Monats / Quartals reichst du die Liste als PDF beim
-          Jagdverband ein (🖨 Drucken im Admin-Panel).</li>
-      <li>Danach setzt du im Admin unter „Einträge gemeldet markieren"
-          bei allen gemeldeten Einträgen 🔒. Dadurch kann niemand mehr
-          aus Versehen Entnahme, Abfall oder Verwendung dieser Einträge
-          ändern.</li>
-      <li>Nur der Admin kann die Sperre wieder aufheben oder den Eintrag
-          weiterhin bearbeiten.</li>
-    </ol>
-    <p>So bleibt dokumentiert: „was wurde offiziell gemeldet" vs. „was ist
-    noch im Fluss".</p>
+  const modusInfo = isAdmin
+    ? '<span style="background:#e8f5e9;color:#1b5e20;padding:2px 8px;border-radius:12px;font-size:11px;">Admin-Ansicht</span>'
+    : '<span style="background:#e3f2fd;color:#0d47a1;padding:2px 8px;border-radius:12px;font-size:11px;">Benutzer-Ansicht</span>';
 
-    <h4>📋 Abschussplan</h4>
-    <p>Im Admin unter „Abschussplan bearbeiten":</p>
-    <ul>
-      <li>Pro Wildart gibt es eine Tabelle mit Klassen.</li>
-      <li>Das Häkchen <b>✓</b> bestimmt, ob eine Klasse im Plan-Popup angezeigt
-          und gezählt wird. Deaktivierte Klassen bleiben gespeichert, werden
-          aber ignoriert.</li>
-      <li><b>Plan</b> = die Sollzahl vom Jagdbezirk.</li>
-      <li><b>Zählt als</b> = optional. Gibt an, welche Wild-Klassen in diese
-          Zeile als Ist-Wert einfließen. Mehrere durch <b>Komma</b> trennen.
-          Beispiel: eine Zeile „Männlich" mit <code>T-Hirsch,J-Hirsch</code>
-          zählt beide Klassen zusammen.</li>
-      <li><b>+ Klasse</b> fügt eine Zeile hinzu, <b>+ neue Wildart</b> eine
-          komplette Gruppe (z.B. Schwarzwild).</li>
-      <li>Das ✕ am Zeilenende löscht eine Zeile.</li>
-      <li>Nach dem Bearbeiten auf <b>💾 Plan speichern</b>.</li>
-    </ul>
-
-    <h4>🖨 Drucken / PDF-Export</h4>
-    <p>Im Admin unter „Daten exportieren / drucken" wählst du ein Jahr und
-    klickst auf <b>🖨 Drucken / PDF</b>. Es erscheint eine querformatige
-    A4-Liste für die amtliche Meldung. Im Browser-Druck-Dialog kannst du
-    entweder echt drucken oder „Als PDF speichern".</p>
-    <p>Alternativ liefert <b>📊 CSV/Excel</b> eine CSV-Datei zum Öffnen in
-    Excel.</p>
-
-    <h4>🗺️ Karte</h4>
-    <p>Im Revier-Tab auf <b>🗺️ Karte</b>. Zeigt alle Abschüsse des aktuell
-    gewählten Jahres als farbige Punkte auf OpenStreetMap. Mit <b>📍 Mein
-    Standort</b> kannst du zu deiner aktuellen Position springen.</p>
-    <p>Einzelne Einträge kannst du in der Tabelle über den Ortsnamen-Link
-    direkt auf der Karte ansehen.</p>
-
-    <h4>🔐 Admin-Login</h4>
-    <p>Oben rechts der Button 🔐. Standard: Benutzer <code>admin</code>,
-    Passwort <code>1234</code>. Unter „Passwort ändern" kannst du es ändern –
-    das alte Passwort wird zur Bestätigung nochmal abgefragt.</p>
-    <p>Ohne Admin-Login kann jeder Einträge anlegen, Entnahme und Abfall
-    setzen. Nur Admin kann <b>bearbeiten, löschen, sperren, Plan pflegen</b>
-    und <b>drucken</b>.</p>
-
-    <h4>📴 Offline-Modus</h4>
-    <p>Die App ist als PWA gebaut: installierbar auf dem Handy-Startbildschirm
-    („Zum Startbildschirm hinzufügen" im Browser-Menü), und funktioniert auch
-    ohne Internet. Einträge, die offline angelegt werden, landen in einer
-    Warteschlange und werden automatisch hochgeladen, sobald wieder Empfang
-    da ist. Ein orangener Banner unten zeigt das an.</p>
-
-    <h4>🌡️ Wetter</h4>
-    <p>Wenn der Abschussort per GPS oder Karte gesetzt ist, holt die App nach
-    dem Speichern automatisch die Wetterlage (Temperatur, Wind) für den
-    Schusszeitpunkt von Open-Meteo und hängt sie an den Eintrag.</p>
-
-    <div style="margin-top:16px;text-align:right;">
-      <button onclick="this.closest('div').parentElement.remove();
-                       this.closest('div').parentElement.nextElementSibling &&
-                       this.closest('div').parentElement.nextElementSibling.remove()">Schließen</button>
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h3 style="margin:0;">❓ Hilfe</h3>
+      ${modusInfo}
     </div>
-  `;
-  // Einfacherer Schließen-Handler: ersetze den komplizierten onclick oben
-  const schliessen = box.querySelector('button[onclick*="remove"]');
-  if (schliessen) schliessen.onclick = () => { ov.remove(); box.remove(); };
+    <p class="hint" style="margin-bottom:10px;">
+      Tippe auf einen Abschnitt, um ihn aufzuklappen.
+    </p>
+    <div class="help-sections">`;
+
+  visibleSections.forEach(s => {
+    html += `
+      <details class="help-section">
+        <summary>${s.icon} <b>${esc(s.title)}</b></summary>
+        <div class="help-body">${s.content}</div>
+      </details>`;
+  });
+
+  html += `
+    </div>
+    <div style="margin-top:14px;text-align:right;">
+      <button id="helpCloseBtn">Schließen</button>
+    </div>`;
+
+  box.innerHTML = html;
+  box.querySelector("#helpCloseBtn").onclick = () => { ov.remove(); box.remove(); };
   document.body.appendChild(ov);
   document.body.appendChild(box);
 }
@@ -1850,8 +2030,13 @@ async function openPlanPopup() {
 /* Jahres-Balkendiagramm: Anzahl Einträge pro Monat, gestapelt nach Wildart */
 function renderMonthChart(entries, year) {
   const MONATE = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
-  // Bekannte Wildarten mit festen Farben (konsistent mit den Kartenmarkern).
+  const isPark = (appMode === "park");
+  // Bekannte Wildarten / Klassen mit festen Farben.
+  // Im Park-Modus gruppieren wir nach Klasse (T-Hirsch ...), daher
+  // brauchen wir die Klassen-Farben auch hier. Konsistent mit den
+  // Karten-Markern.
   const FARBEN = {
+    // Revier-Wildarten
     "Rehwild":    "#FFD600",
     "Rotwild":    "#E53935",
     "Gamswild":   "#424242",
@@ -1860,6 +2045,13 @@ function renderMonthChart(entries, year) {
     "Schwarzwild":"#6D4C41",
     "Murmeltier": "#00897B",
     "Steinbock":  "#8BC34A",
+    // Park-Klassen (Rotwild)
+    "T-Hirsch":   "#8E0000",
+    "J-Hirsch":   "#FF6D00",
+    "Tier":       "#E91E63",
+    "Schmaltier": "#AB47BC",
+    "Kalb":       "#FFEB3B",
+    // Sonstige
     "Fallwild":   "#9C27B0",   // Fallwild als eigene Kategorie
     "Andere":     "#1E88E5",
   };
@@ -1877,11 +2069,20 @@ function renderMonthChart(entries, year) {
   }
 
   // Pro Monat pro Kategorie zählen. Fallwild ist eine eigene
-  // Kategorie, damit es im Chart unterscheidbar ist.
+  // Kategorie, damit es im Chart unterscheidbar ist. Im Park-Modus
+  // wird nach Klasse (T-Hirsch, J-Hirsch, ...) gruppiert, im Revier
+  // nach Wildart.
   const months = Array.from({length: 12}, () => ({}));
   entries.forEach(d => {
     const m = new Date(d.datum).getMonth();
-    const a = d.ist_fallwild ? "Fallwild" : (d.wildart || "Andere");
+    let a;
+    if (d.ist_fallwild) {
+      a = "Fallwild";
+    } else if (isPark) {
+      a = d.wild || "–";
+    } else {
+      a = d.wildart || "Andere";
+    }
     months[m][a] = (months[m][a] || 0) + 1;
   });
   const totals = months.map(m => Object.values(m).reduce((s,n) => s+n, 0));
@@ -1921,10 +2122,17 @@ function renderMonthChart(entries, year) {
 
   html += '</svg>';
 
-  // Legende zeigt alle tatsächlich vorkommenden Kategorien (inkl. Fallwild)
+  // Legende zeigt alle tatsächlich vorkommenden Kategorien (inkl. Fallwild).
+  // Dieselbe Gruppierung wie im Chart: Park -> nach Klasse, Revier -> nach Wildart
   const wildarten = new Set();
   entries.forEach(d => {
-    wildarten.add(d.ist_fallwild ? "Fallwild" : (d.wildart || "Andere"));
+    if (d.ist_fallwild) {
+      wildarten.add("Fallwild");
+    } else if (isPark) {
+      wildarten.add(d.wild || "–");
+    } else {
+      wildarten.add(d.wildart || "Andere");
+    }
   });
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin-top:4px;">';
   [...wildarten].sort().forEach(a => {
@@ -2040,7 +2248,7 @@ async function renderPlan() {
 
   const kontextLabel = kontext === "park" ? "🌲 Park" : "🎯 Revier";
   let html = '<p class="hint">Bereich: <b>' + kontextLabel + '</b><br>✓ = wird im Plan gezählt.<br>'
-           + '„Zählt als" ist optional und fasst mehrere Wild-Klassen zu einer Zeile zusammen.<br>'
+           + '&bdquo;Zählt als&ldquo; ist optional und fasst mehrere Wild-Klassen zu einer Zeile zusammen.<br>'
            + 'Mehrere durch <b>Komma</b> trennen, z.B.: <code>T-Hirsch,J-Hirsch</code> ergibt eine Zeile „Männlich".<br>'
            + 'Leer lassen heißt: nur Einträge mit genau diesem Klassennamen werden gezählt.</p>';
 
@@ -2262,12 +2470,65 @@ function setAndere() {
 function nextOrt() {
   const g = document.getElementById("inputGewicht").value;
   if (g === "" || parseInt(g, 10) <= 0) {
-    toast("Bitte ein Gewicht > 0 auswählen", "warn");
+    toast("Bitte ein Gewicht auswählen oder \"Später eintragen\" tippen", "warn");
     document.getElementById("inputGewicht").focus();
     return;
   }
   e.gewicht = g;
   zeigeSeite("wf-ort");
+}
+
+function skipGewicht() {
+  e.gewicht = null;   // explizit leer, wird später nachgetragen
+  zeigeSeite("wf-ort");
+}
+
+/* Erzeugt die HTML-Zelle für das Gewicht - entweder den Wert,
+   einen Strich oder den klickbaren "Gewicht eintragen"-Button. */
+function renderGewichtCell(d) {
+  if (d.gewicht != null && d.gewicht !== "") {
+    return d.gewicht + " kg";
+  }
+  // Leeres Gewicht: erlauben, einmalig nachzutragen, solange nicht gemeldet
+  if (d.gemeldet && !isAdmin) return "–";
+  return `<span class="tag-btn" style="background:#757575;color:#fff;cursor:pointer;"
+            onclick="event.stopPropagation();setGewichtLater(${d.id})">
+            + kg
+          </span>`;
+}
+
+/* Setzt nachträglich das Gewicht. Für nicht-Admins nur einmalig,
+   solange d.gewicht noch leer ist. Admin kann es ohnehin über den
+   Edit-Dialog ändern. */
+async function setGewichtLater(id) {
+  id = Number(id);
+  const d = daten.find(x => Number(x.id) === id);
+  if (!d) { alert("Eintrag nicht gefunden"); return; }
+  if (d.gewicht != null && d.gewicht !== "" && !isAdmin) {
+    alert("Gewicht ist bereits eingetragen und kann nicht mehr geändert werden.");
+    return;
+  }
+  if (d.gemeldet && !isAdmin) {
+    alert("Eintrag ist gemeldet, das Gewicht kann nicht mehr geändert werden.");
+    return;
+  }
+  const input = prompt("Gewicht in kg eingeben:", "");
+  if (input == null) return;
+  const g = parseInt(input, 10);
+  if (isNaN(g) || g <= 0 || g > 500) {
+    alert("Bitte eine Zahl zwischen 1 und 500 eingeben.");
+    return;
+  }
+  try {
+    // Eigenständige Sub-Action: funktioniert auch ohne Admin, solange das
+    // Gewicht noch leer ist und der Eintrag nicht gemeldet ist.
+    const row = await api.eintragAction(id, 'gewicht', g);
+    applyRow(row);
+    anzeigen();
+    toast("✓ Gewicht eingetragen: " + g + " kg");
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
 }
 function setOrt(o) { o==="Prad" ? openMap("input") : (e.ort=o, zeigeSeite("wf-zeit")); }
 
@@ -2507,12 +2768,19 @@ function ensureLeaflet() {
   leafletEntryLayer = L.layerGroup().addTo(leafletMap);
 
   leafletClickHandler = function (ev) {
-    if (mapMode !== 'input') return;
+    if (mapMode !== 'input' && mapMode !== 'edit') return;
     aktuellerPunkt = { lat: ev.latlng.lat, lng: ev.latlng.lng };
     if (leafletTempMarker) leafletTempMarker.remove();
-    leafletTempMarker = L.marker(ev.latlng, {
-      icon: makeDivIcon(e.wildart, e.wild, !!e.ist_park)
-    }).addTo(leafletMap);
+    // Icon: im edit-Modus nach dem bearbeiteten Eintrag richten,
+    // im input-Modus nach dem aktuell in Bearbeitung befindlichen e.
+    let ico;
+    if (mapMode === 'edit') {
+      const d = daten.find(x => Number(x.id) === Number(editLocationId));
+      ico = makeDivIcon(d && d.wildart, d && d.wild, d && !!d.ist_park);
+    } else {
+      ico = makeDivIcon(e.wildart, e.wild, !!e.ist_park);
+    }
+    leafletTempMarker = L.marker(ev.latlng, { icon: ico }).addTo(leafletMap);
   };
   leafletMap.on('click', leafletClickHandler);
   return leafletMap;
@@ -2677,9 +2945,49 @@ function setupMapMarkers(mode) {
     } else {
       map.setView(PRAD_CENTER, PRAD_ZOOM);
     }
+  } else if (mode === "edit") {
+    // Standort-Edit: aktuellen Marker des Eintrags vorladen,
+    // User kann einen neuen Punkt setzen.
+    const d = daten.find(x => Number(x.id) === Number(editLocationId));
+    if (d && validLL(d.latlng)) {
+      leafletTempMarker = L.marker(d.latlng, {
+        icon: makeDivIcon(d.wildart, d.wild, !!d.ist_park)
+      }).addTo(map);
+      map.setView([d.latlng.lat, d.latlng.lng], 15, { animate: false });
+      setTimeout(() => map.setView([d.latlng.lat, d.latlng.lng], 15, { animate: false }), 250);
+    } else {
+      map.setView(PRAD_CENTER, PRAD_ZOOM);
+    }
   }
 }
 function openMapAll() { openMap("view"); }
+function openMapForEdit(id) {
+  if (!isAdmin) return alert("Nur der Admin kann den Standort ändern.");
+  editLocationId = Number(id);
+  // Edit-Dialog schließen (aber nicht zerstören), Karte öffnen
+  closePopups();
+  openMap("edit");
+}
+
+/* Speichert die neue Koordinate an den Eintrag und öffnet den
+   Edit-Dialog wieder, damit der Admin weiter bearbeiten kann. */
+async function saveLocationChange(id, latlng) {
+  try {
+    const body = {
+      koord_lat: latlng.lat,
+      koord_lng: latlng.lng,
+      ort: "Prad",
+    };
+    const row = await api.updateEintrag(id, body);
+    applyRow(row);
+    anzeigen();
+    toast("✓ Standort aktualisiert");
+    // Edit-Dialog wieder öffnen, falls der Admin weiter bearbeiten will
+    setTimeout(() => openEdit(id), 100);
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
+}
 function openMapFromTable(id) {
   id = Number(id);
   singleViewEntry = daten.find(x => Number(x.id) === id) || null;
@@ -2696,6 +3004,14 @@ function closeMap() {
     if (aktuellerPunkt) e.latlng = aktuellerPunkt;
     e.ort = "Prad";
     zeigeSeite("wf-zeit");
+  } else if (mapMode === "edit" && editLocationId != null) {
+    // Standort eines bestehenden Eintrags ändern: speichern per API
+    const newPt = aktuellerPunkt;
+    const idToSave = editLocationId;
+    editLocationId = null;
+    if (newPt) {
+      saveLocationChange(idToSave, newPt);
+    }
   }
   aktuellerPunkt = null;
   // Map komplett zerstören, damit sie beim nächsten Öffnen frisch
@@ -2763,7 +3079,8 @@ function anzeigen() {
       (d.gemeldet ? "🔒 " : "") + (d.ist_fallwild ? "☠ " : "") + (d.name||"");
     r.insertCell().innerText = d.wildart||"";
     r.insertCell().innerText = d.wild||"";
-    r.insertCell().innerText = d.gewicht||"";
+    const gewCell = r.insertCell();
+    gewCell.innerHTML = renderGewichtCell(d);
 
     const oc = r.insertCell();
     if (d.latlng) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`;
@@ -2840,7 +3157,7 @@ function anzeigen() {
         <div class="card-head-admin">${adminH}</div>
         <div class="card-grid">
           <div><span class="label">Erleger</span><br>${esc(d.name||"")}</div>
-          <div><span class="label">Gewicht</span><br>${d.gewicht ? d.gewicht+" kg" : "–"}</div>
+          <div><span class="label">Gewicht</span><br>${renderGewichtCell(d)}</div>
           <div><span class="label">Ort</span><br>${ortH}</div>
           <div><span class="label">Zeit</span><br>${esc(d.zeit||"")}</div>
           <div><span class="label">Datum</span><br>${formatDatum(d.datum)}</div>
@@ -2992,6 +3309,13 @@ function openEdit(id) {
     <div class="edit-row"><label>Detail</label><input id="ed_wild" value="${esc(d.wild||"")}"></div>
     <div class="edit-row"><label>Gewicht (kg)</label><input id="ed_gew" type="number" min="0" max="200" value="${d.gewicht||""}"></div>
     <div class="edit-row"><label>Ort</label><input id="ed_ort" value="${esc(d.ort||"")}"></div>
+    <div class="edit-row">
+      <label>Standort (GPS)</label>
+      <div id="ed_latlng_display" style="font-size:12px;color:var(--grau);margin-bottom:4px;">
+        ${d.latlng ? (d.latlng.lat.toFixed(6) + ', ' + d.latlng.lng.toFixed(6)) : '<i>nicht gesetzt</i>'}
+      </div>
+      <button class="sm sec" onclick="openMapForEdit(${id})" style="margin:0;">🗺 Standort auf Karte ändern</button>
+    </div>
     <div class="edit-row"><label>Schusszeit</label><input id="ed_zeit" type="time" value="${d.zeit||""}"></div>
     <div class="edit-row"><label>Datum (Einlagerung)</label><input id="ed_datum" type="date" value="${d.datum||""}"></div>
     <div class="edit-row">
@@ -3188,14 +3512,12 @@ function updateBottomNav() {
   nav.style.display = hidden ? "none" : "flex";
   document.body.classList.toggle("has-bottom-nav", !hidden);
 
-  // FAB nur anzeigen, wenn wir in der Revier- oder Park-Liste sind -
-  // sonst wüsste der User nicht, in welchem Bereich der Eintrag
-  // angelegt wird. Doppelt abgesichert per CSS-Klasse UND
-  // inline-style.
-  const showFab = (pageId === "revier");
-  nav.classList.toggle("no-fab", !showFab);
-  const fab = nav.querySelector(".bn-fab");
-  if (fab) fab.style.display = showFab ? "flex" : "none";
+  // Floating FAB (Neuer Eintrag) nur in Revier/Park sichtbar.
+  const fab = document.getElementById("floatingFab");
+  if (fab) {
+    const showFab = (pageId === "revier");
+    fab.style.display = showFab ? "block" : "none";
+  }
 
   // Aktiven Button markieren
   nav.querySelectorAll("button[data-page]").forEach(btn => {
@@ -3267,16 +3589,30 @@ async function adminLogoutFull() {
   applyConfig(); anzeigen(); zeigeSeite("start");
 }
 
-function saveConfig() {
-  config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdrevier Prad";
-  config.code = document.getElementById("cfgCode").value.trim() || "1024";
-  config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
-  config.planVisible = document.getElementById("cfgPlanVisible").checked;
+async function saveConfig() {
+  config.revier       = document.getElementById("cfgRevier").value.trim() || "Jagdrevier Prad";
+  config.code         = document.getElementById("cfgCode").value.trim() || "1024";
+  config.abfallText   = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
+  config.planVisible  = document.getElementById("cfgPlanVisible").checked;
   config.cardsCompact = document.getElementById("cfgCardsCompact").checked;
-  config.parkVisible = document.getElementById("cfgParkVisible").checked;
-  saveCfg(); applyConfig();
-  anzeigen();     // Tabelle neu rendern, damit die Card-Darstellung wechselt
-  toast("✓ Einstellungen gespeichert");
+  config.parkVisible  = document.getElementById("cfgParkVisible").checked;
+  saveCfg();         // lokaler Cache
+  applyConfig();
+  anzeigen();        // Tabelle neu rendern, damit die Card-Darstellung wechselt
+  // Server-seitig speichern, damit die Werte für ALLE Geräte gelten
+  try {
+    await api.saveConfig({
+      revier:       config.revier,
+      code:         config.code,
+      abfallText:   config.abfallText,
+      planVisible:  config.planVisible  ? "1" : "0",
+      cardsCompact: config.cardsCompact ? "1" : "0",
+      parkVisible:  config.parkVisible  ? "1" : "0",
+    });
+    toast("✓ Einstellungen gespeichert");
+  } catch (err) {
+    toast("⚠ Lokal gespeichert, Server-Speichern fehlgeschlagen: " + err.message, "warn");
+  }
 }
 
 async function changePassword() {

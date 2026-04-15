@@ -133,6 +133,25 @@ if ($method === 'POST') {
             jsonOk(loadEntry($pdo, $id));
         }
 
+        if ($action === 'gewicht') {
+            // Nachträgliches Gewicht setzen - einmalig, solange bisher leer.
+            // Ohne Admin-Rechte erlaubt, aber gesperrt wenn gemeldet.
+            if (entryIsLocked($entry) && !isAdmin()) {
+                jsonErr('Eintrag ist als gemeldet gesperrt', 403);
+            }
+            $alt = $entry['gewicht'] ?? null;
+            if ($alt !== null && $alt !== '' && !isAdmin()) {
+                jsonErr('Gewicht ist bereits gesetzt und kann nur vom Admin geändert werden', 403);
+            }
+            $val = (int) ($in['value'] ?? 0);
+            if ($val <= 0 || $val > 500) {
+                jsonErr('Ungültiges Gewicht');
+            }
+            $pdo->prepare('UPDATE eintraege SET gewicht = :v WHERE id = :id')
+                ->execute([':v' => $val, ':id' => $id]);
+            jsonOk(loadEntry($pdo, $id));
+        }
+
         jsonErr('Unbekannte action');
     }
 
