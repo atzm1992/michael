@@ -841,6 +841,8 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   <h3>⚖️ Gewicht (kg)</h3>
   <select id="inputGewicht"></select>
   <button onclick="nextOrt()">Weiter ➡</button>
+  <button class="sec" onclick="skipGewicht()" style="background:#757575;">⏭ Später eintragen</button>
+  <p class="hint">Bei „Später eintragen" kannst du das Gewicht einmal nach dem Speichern direkt im Eintrag nachtragen.</p>
   <button class="sec" onclick="zeigeSeite('wf-wild')">⬅ Zurück</button>
   <button class="sec" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
@@ -2468,12 +2470,65 @@ function setAndere() {
 function nextOrt() {
   const g = document.getElementById("inputGewicht").value;
   if (g === "" || parseInt(g, 10) <= 0) {
-    toast("Bitte ein Gewicht > 0 auswählen", "warn");
+    toast("Bitte ein Gewicht auswählen oder \"Später eintragen\" tippen", "warn");
     document.getElementById("inputGewicht").focus();
     return;
   }
   e.gewicht = g;
   zeigeSeite("wf-ort");
+}
+
+function skipGewicht() {
+  e.gewicht = null;   // explizit leer, wird später nachgetragen
+  zeigeSeite("wf-ort");
+}
+
+/* Erzeugt die HTML-Zelle für das Gewicht - entweder den Wert,
+   einen Strich oder den klickbaren "Gewicht eintragen"-Button. */
+function renderGewichtCell(d) {
+  if (d.gewicht != null && d.gewicht !== "") {
+    return d.gewicht + " kg";
+  }
+  // Leeres Gewicht: erlauben, einmalig nachzutragen, solange nicht gemeldet
+  if (d.gemeldet && !isAdmin) return "–";
+  return `<span class="tag-btn" style="background:#757575;color:#fff;cursor:pointer;"
+            onclick="event.stopPropagation();setGewichtLater(${d.id})">
+            + kg
+          </span>`;
+}
+
+/* Setzt nachträglich das Gewicht. Für nicht-Admins nur einmalig,
+   solange d.gewicht noch leer ist. Admin kann es ohnehin über den
+   Edit-Dialog ändern. */
+async function setGewichtLater(id) {
+  id = Number(id);
+  const d = daten.find(x => Number(x.id) === id);
+  if (!d) { alert("Eintrag nicht gefunden"); return; }
+  if (d.gewicht != null && d.gewicht !== "" && !isAdmin) {
+    alert("Gewicht ist bereits eingetragen und kann nicht mehr geändert werden.");
+    return;
+  }
+  if (d.gemeldet && !isAdmin) {
+    alert("Eintrag ist gemeldet, das Gewicht kann nicht mehr geändert werden.");
+    return;
+  }
+  const input = prompt("Gewicht in kg eingeben:", "");
+  if (input == null) return;
+  const g = parseInt(input, 10);
+  if (isNaN(g) || g <= 0 || g > 500) {
+    alert("Bitte eine Zahl zwischen 1 und 500 eingeben.");
+    return;
+  }
+  try {
+    // Eigenständige Sub-Action: funktioniert auch ohne Admin, solange das
+    // Gewicht noch leer ist und der Eintrag nicht gemeldet ist.
+    const row = await api.eintragAction(id, 'gewicht', g);
+    applyRow(row);
+    anzeigen();
+    toast("✓ Gewicht eingetragen: " + g + " kg");
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
 }
 function setOrt(o) { o==="Prad" ? openMap("input") : (e.ort=o, zeigeSeite("wf-zeit")); }
 
@@ -3024,7 +3079,8 @@ function anzeigen() {
       (d.gemeldet ? "🔒 " : "") + (d.ist_fallwild ? "☠ " : "") + (d.name||"");
     r.insertCell().innerText = d.wildart||"";
     r.insertCell().innerText = d.wild||"";
-    r.insertCell().innerText = d.gewicht||"";
+    const gewCell = r.insertCell();
+    gewCell.innerHTML = renderGewichtCell(d);
 
     const oc = r.insertCell();
     if (d.latlng) oc.innerHTML = `<span class="link" onclick="openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`;
@@ -3101,7 +3157,7 @@ function anzeigen() {
         <div class="card-head-admin">${adminH}</div>
         <div class="card-grid">
           <div><span class="label">Erleger</span><br>${esc(d.name||"")}</div>
-          <div><span class="label">Gewicht</span><br>${d.gewicht ? d.gewicht+" kg" : "–"}</div>
+          <div><span class="label">Gewicht</span><br>${renderGewichtCell(d)}</div>
           <div><span class="label">Ort</span><br>${ortH}</div>
           <div><span class="label">Zeit</span><br>${esc(d.zeit||"")}</div>
           <div><span class="label">Datum</span><br>${formatDatum(d.datum)}</div>
