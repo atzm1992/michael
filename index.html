@@ -1262,6 +1262,7 @@ let aktuellerPunkt = null;
 let mapMode = "input";
 let viewIndex = null;
 let singleViewEntry = null;   // beim Single-View per Tabellenklick gesetzt
+let editLocationId  = null;   // beim Edit-Location-Modus: welche id wird bearbeitet
 let selectedYear = new Date().getFullYear();
 let statsFilter = "";         // Filter per Klick auf eine Stat-Kachel
 let appMode = "revier";       // "revier" oder "park" - steuert die Liste
@@ -2712,12 +2713,19 @@ function ensureLeaflet() {
   leafletEntryLayer = L.layerGroup().addTo(leafletMap);
 
   leafletClickHandler = function (ev) {
-    if (mapMode !== 'input') return;
+    if (mapMode !== 'input' && mapMode !== 'edit') return;
     aktuellerPunkt = { lat: ev.latlng.lat, lng: ev.latlng.lng };
     if (leafletTempMarker) leafletTempMarker.remove();
-    leafletTempMarker = L.marker(ev.latlng, {
-      icon: makeDivIcon(e.wildart, e.wild, !!e.ist_park)
-    }).addTo(leafletMap);
+    // Icon: im edit-Modus nach dem bearbeiteten Eintrag richten,
+    // im input-Modus nach dem aktuell in Bearbeitung befindlichen e.
+    let ico;
+    if (mapMode === 'edit') {
+      const d = daten.find(x => Number(x.id) === Number(editLocationId));
+      ico = makeDivIcon(d && d.wildart, d && d.wild, d && !!d.ist_park);
+    } else {
+      ico = makeDivIcon(e.wildart, e.wild, !!e.ist_park);
+    }
+    leafletTempMarker = L.marker(ev.latlng, { icon: ico }).addTo(leafletMap);
   };
   leafletMap.on('click', leafletClickHandler);
   return leafletMap;
@@ -2882,9 +2890,49 @@ function setupMapMarkers(mode) {
     } else {
       map.setView(PRAD_CENTER, PRAD_ZOOM);
     }
+  } else if (mode === "edit") {
+    // Standort-Edit: aktuellen Marker des Eintrags vorladen,
+    // User kann einen neuen Punkt setzen.
+    const d = daten.find(x => Number(x.id) === Number(editLocationId));
+    if (d && validLL(d.latlng)) {
+      leafletTempMarker = L.marker(d.latlng, {
+        icon: makeDivIcon(d.wildart, d.wild, !!d.ist_park)
+      }).addTo(map);
+      map.setView([d.latlng.lat, d.latlng.lng], 15, { animate: false });
+      setTimeout(() => map.setView([d.latlng.lat, d.latlng.lng], 15, { animate: false }), 250);
+    } else {
+      map.setView(PRAD_CENTER, PRAD_ZOOM);
+    }
   }
 }
 function openMapAll() { openMap("view"); }
+function openMapForEdit(id) {
+  if (!isAdmin) return alert("Nur der Admin kann den Standort ändern.");
+  editLocationId = Number(id);
+  // Edit-Dialog schließen (aber nicht zerstören), Karte öffnen
+  closePopups();
+  openMap("edit");
+}
+
+/* Speichert die neue Koordinate an den Eintrag und öffnet den
+   Edit-Dialog wieder, damit der Admin weiter bearbeiten kann. */
+async function saveLocationChange(id, latlng) {
+  try {
+    const body = {
+      koord_lat: latlng.lat,
+      koord_lng: latlng.lng,
+      ort: "Prad",
+    };
+    const row = await api.updateEintrag(id, body);
+    applyRow(row);
+    anzeigen();
+    toast("✓ Standort aktualisiert");
+    // Edit-Dialog wieder öffnen, falls der Admin weiter bearbeiten will
+    setTimeout(() => openEdit(id), 100);
+  } catch (err) {
+    alert("Speichern fehlgeschlagen: " + err.message);
+  }
+}
 function openMapFromTable(id) {
   id = Number(id);
   singleViewEntry = daten.find(x => Number(x.id) === id) || null;
@@ -2901,6 +2949,14 @@ function closeMap() {
     if (aktuellerPunkt) e.latlng = aktuellerPunkt;
     e.ort = "Prad";
     zeigeSeite("wf-zeit");
+  } else if (mapMode === "edit" && editLocationId != null) {
+    // Standort eines bestehenden Eintrags ändern: speichern per API
+    const newPt = aktuellerPunkt;
+    const idToSave = editLocationId;
+    editLocationId = null;
+    if (newPt) {
+      saveLocationChange(idToSave, newPt);
+    }
   }
   aktuellerPunkt = null;
   // Map komplett zerstören, damit sie beim nächsten Öffnen frisch
@@ -3197,6 +3253,13 @@ function openEdit(id) {
     <div class="edit-row"><label>Detail</label><input id="ed_wild" value="${esc(d.wild||"")}"></div>
     <div class="edit-row"><label>Gewicht (kg)</label><input id="ed_gew" type="number" min="0" max="200" value="${d.gewicht||""}"></div>
     <div class="edit-row"><label>Ort</label><input id="ed_ort" value="${esc(d.ort||"")}"></div>
+    <div class="edit-row">
+      <label>Standort (GPS)</label>
+      <div id="ed_latlng_display" style="font-size:12px;color:var(--grau);margin-bottom:4px;">
+        ${d.latlng ? (d.latlng.lat.toFixed(6) + ', ' + d.latlng.lng.toFixed(6)) : '<i>nicht gesetzt</i>'}
+      </div>
+      <button class="sm sec" onclick="openMapForEdit(${id})" style="margin:0;">🗺 Standort auf Karte ändern</button>
+    </div>
     <div class="edit-row"><label>Schusszeit</label><input id="ed_zeit" type="time" value="${d.zeit||""}"></div>
     <div class="edit-row"><label>Datum (Einlagerung)</label><input id="ed_datum" type="date" value="${d.datum||""}"></div>
     <div class="edit-row">
