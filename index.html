@@ -1823,7 +1823,7 @@ function openHelp() {
         "oder Park-Liste. Du gehst der Reihe nach durch die Schritte: " +
         "Erleger → Wildart → Klasse → Gewicht → Ort → Zeit → Datum → " +
         "Verwendung → Zusammenfassung → Speichern. Datum und Uhrzeit " +
-        "sind auf „jetzt" vorausgefüllt."
+        "sind auf &bdquo;jetzt&rdquo; vorausgefüllt."
     },
     {
       icon: "📍", title: "Ort setzen",
@@ -1844,8 +1844,8 @@ function openHelp() {
       icon: "📊", title: "Stat-Kacheln als Filter",
       content:
         "Im Revier-/Park-Tab kannst du auf die farbigen Kacheln (z.B. " +
-        "„Rehwild 3") tippen – die Liste wird dann auf diese Wildart oder " +
-        "Klasse gefiltert. Nochmal tippen oder „Gesamt" → Filter aus."
+        "&bdquo;Rehwild 3&ldquo;) tippen – die Liste wird dann auf diese Wildart oder " +
+        "Klasse gefiltert. Nochmal tippen oder &bdquo;Gesamt&ldquo; → Filter aus."
     },
     {
       icon: "🔍", title: "Suche",
@@ -1857,7 +1857,7 @@ function openHelp() {
     {
       icon: "🗺", title: "Karte",
       content:
-        "Im ⋯ Mehr-Menü „Karte" tippen. Zeigt alle Abschüsse des aktuellen " +
+        "Im ⋯ Mehr-Menü &bdquo;Karte&ldquo; tippen. Zeigt alle Abschüsse des aktuellen " +
         "Jahres als farbige Punkte. Mit <b>🛰 Satellit</b> oben rechts " +
         "schaltest du zwischen Karten- und Satellitenansicht um. Mit " +
         "<b>📍 Mein Standort</b> springst du zu deiner aktuellen Position."
@@ -1866,7 +1866,7 @@ function openHelp() {
       show: () => planOn,
       icon: "📋", title: "Abschussplan (Popup)",
       content:
-        "Im ⋯ Mehr-Menü „Plan" tippen. Zeigt das Monats-Balkendiagramm und " +
+        "Im ⋯ Mehr-Menü &bdquo;Plan&ldquo; tippen. Zeigt das Monats-Balkendiagramm und " +
         "die Plan/Ist/Extern/Rest-Tabelle. Rest-Formel: " +
         "<code>Plan − Ist − Extern</code>. Fallwild wird nicht im Plan " +
         "gezählt."
@@ -1896,12 +1896,12 @@ function openHelp() {
       content:
         "Oben rechts der Button 🔐. Als Admin kannst du Einträge bearbeiten, " +
         "löschen und sperren, den Abschussplan pflegen sowie drucken. " +
-        "Unter „Passwort ändern" kannst du dein Passwort neu setzen – das " +
+        "Unter &bdquo;Passwort ändern&ldquo; kannst du dein Passwort neu setzen – das " +
         "alte wird zur Bestätigung abgefragt."
     },
     {
       adminOnly: true,
-      icon: "🔒", title: "Eintrag „gemeldet" sperren",
+      icon: "🔒", title: "Eintrag &bdquo;gemeldet&ldquo; sperren",
       content:
         "Gemeldete Einträge sind gegen Änderungen geschützt. Typischer " +
         "Ablauf:<ol><li>Jäger trägt den Abschuss ein.</li>" +
@@ -1916,15 +1916,15 @@ function openHelp() {
       content:
         "Im Admin → Plan. Kontext (🎯 Revier / 🌲 Park) wählen, Jahr " +
         "wählen, pro Klasse: ✓ Haken = zählt, Plan = Sollzahl, Extern = " +
-        "von außerhalb angerechnete Abschüsse, „Zählt als" = optional " +
+        "von außerhalb angerechnete Abschüsse, &bdquo;Zählt als&ldquo; = optional " +
         "mehrere Klassen zu einer Zeile zusammenfassen (Komma-getrennt)."
     },
     {
       adminOnly: true,
       icon: "☠", title: "Fallwild markieren",
       content:
-        "Im Edit-Dialog eines Eintrags gibt es eine Checkbox „als " +
-        "Fallwild markieren". Fallwild wird NICHT im Plan gezählt, aber " +
+        "Im Edit-Dialog eines Eintrags gibt es eine Checkbox &bdquo;als " +
+        "Fallwild markieren&ldquo;. Fallwild wird NICHT im Plan gezählt, aber " +
         "separat in den Stats und im Monats-Chart angezeigt."
     },
     {
@@ -1940,7 +1940,7 @@ function openHelp() {
       adminOnly: true,
       icon: "💾", title: "Backup & Restore",
       content:
-        "Im Admin → Export → „Backup der Datenbank". Das Backup ist ein " +
+        "Im Admin → Export → &bdquo;Backup der Datenbank&ldquo;. Das Backup ist ein " +
         "JSON-Dump (ohne Passwörter). Beim Einspielen werden alle Daten " +
         "überschrieben – vorher also immer ein aktuelles Backup machen."
     },
@@ -2245,7 +2245,7 @@ async function renderPlan() {
 
   const kontextLabel = kontext === "park" ? "🌲 Park" : "🎯 Revier";
   let html = '<p class="hint">Bereich: <b>' + kontextLabel + '</b><br>✓ = wird im Plan gezählt.<br>'
-           + '„Zählt als" ist optional und fasst mehrere Wild-Klassen zu einer Zeile zusammen.<br>'
+           + '&bdquo;Zählt als&ldquo; ist optional und fasst mehrere Wild-Klassen zu einer Zeile zusammen.<br>'
            + 'Mehrere durch <b>Komma</b> trennen, z.B.: <code>T-Hirsch,J-Hirsch</code> ergibt eine Zeile „Männlich".<br>'
            + 'Leer lassen heißt: nur Einträge mit genau diesem Klassennamen werden gezählt.</p>';
 
