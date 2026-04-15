@@ -1154,19 +1154,58 @@ async function flushOutbox() {
   updateOfflineBanner();
 }
 
-/* ---------- Kosmetische Client-Konfiguration (bleibt lokal) ---------- */
+/* ---------- Kosmetische Client-Konfiguration ---------- */
+/* Wird beim Start aus der DB geladen (api/config.php) und nach
+   Änderung dort gespeichert. localStorage dient nur als Offline-
+   Fallback-Cache, damit die Seite auch ohne Netz sinnvoll startet. */
 let config = JSON.parse(localStorage.getItem("cfg") || '{}');
 // One-time-Migration: alter Name "Jagdverein Prad" → "Jagdrevier Prad"
 if (config.revier === "Jagdverein Prad") {
   config.revier = "Jagdrevier Prad";
   localStorage.setItem("cfg", JSON.stringify(config));
 }
-if (!config.revier) config.revier = "Jagdrevier Prad";
-if (!config.code) config.code = "1024";
-if (!config.abfallText) config.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
-if (typeof config.planVisible === "undefined") config.planVisible = true;
-if (typeof config.cardsCompact === "undefined") config.cardsCompact = true;
-if (typeof config.parkVisible === "undefined") config.parkVisible = true;
+applyConfigDefaults(config);
+
+function applyConfigDefaults(c) {
+  if (!c.revier) c.revier = "Jagdrevier Prad";
+  if (!c.code) c.code = "1024";
+  if (!c.abfallText) c.abfallText = "ACHTUNG: Abfall nur während Parkjagd.";
+  if (typeof c.planVisible  === "undefined") c.planVisible  = true;
+  if (typeof c.cardsCompact === "undefined") c.cardsCompact = true;
+  if (typeof c.parkVisible  === "undefined") c.parkVisible  = true;
+}
+
+/* Typen-Fix: aus der DB kommen alle Werte als String.
+   Wir konvertieren Booleans wieder zurück. */
+function coerceConfig(raw) {
+  const BOOL_KEYS = ["planVisible", "cardsCompact", "parkVisible"];
+  const out = {};
+  for (const k of Object.keys(raw || {})) {
+    let v = raw[k];
+    if (BOOL_KEYS.includes(k)) {
+      v = (v === "1" || v === "true" || v === true);
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
+/* Lädt die Config vom Server und merged sie in die lokale Variable. */
+async function loadRemoteConfig() {
+  try {
+    const remote = await api.getConfig();
+    const coerced = coerceConfig(remote);
+    // Merge: Server-Werte überschreiben lokale Defaults, lokale Werte
+    // bleiben für Felder, die der Server (noch) nicht hat.
+    Object.assign(config, coerced);
+    applyConfigDefaults(config);
+    // Auch lokal cachen für den nächsten Offline-Start.
+    try { localStorage.setItem("cfg", JSON.stringify(config)); } catch (_) {}
+  } catch (err) {
+    // Kein Netz / Server weg → wir bleiben bei den lokalen Werten.
+    console.warn("[config] Konnte Server-Config nicht laden:", err);
+  }
+}
 
 /* ---------- Echte Daten: werden aus der API geladen ---------- */
 let daten = [];                 // alle Einträge (aus api/daten.php)
@@ -1244,6 +1283,13 @@ const api = {
     return this.req('api/auth.php', {
       method: 'POST',
       body: JSON.stringify({ action: 'change_pw', old: oldPw, new: newPw }),
+    });
+  },
+  getConfig() { return this.req('api/settings.php'); },
+  saveConfig(values) {
+    return this.req('api/settings.php', {
+      method: 'POST',
+      body: JSON.stringify({ values }),
     });
   },
 };
@@ -1426,6 +1472,11 @@ async function init() {
     isAdmin = a && a.rolle === 'admin';
     currentUser = (a && a.logged_in) ? a.username : null;
   } catch (_) { isAdmin = false; currentUser = null; }
+
+  // Server-Config laden (überschreibt den lokalen Cache). Die Werte
+  // gelten für alle Geräte, werden aber lokal gecached, damit die
+  // Seite offline startet.
+  await loadRemoteConfig();
 
   // Daten laden
   await reloadDaten();
@@ -3267,16 +3318,30 @@ async function adminLogoutFull() {
   applyConfig(); anzeigen(); zeigeSeite("start");
 }
 
-function saveConfig() {
-  config.revier = document.getElementById("cfgRevier").value.trim() || "Jagdrevier Prad";
-  config.code = document.getElementById("cfgCode").value.trim() || "1024";
-  config.abfallText = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
-  config.planVisible = document.getElementById("cfgPlanVisible").checked;
+async function saveConfig() {
+  config.revier       = document.getElementById("cfgRevier").value.trim() || "Jagdrevier Prad";
+  config.code         = document.getElementById("cfgCode").value.trim() || "1024";
+  config.abfallText   = document.getElementById("cfgAbfallText").value.trim() || "ACHTUNG: Abfall nur während Parkjagd.";
+  config.planVisible  = document.getElementById("cfgPlanVisible").checked;
   config.cardsCompact = document.getElementById("cfgCardsCompact").checked;
-  config.parkVisible = document.getElementById("cfgParkVisible").checked;
-  saveCfg(); applyConfig();
-  anzeigen();     // Tabelle neu rendern, damit die Card-Darstellung wechselt
-  toast("✓ Einstellungen gespeichert");
+  config.parkVisible  = document.getElementById("cfgParkVisible").checked;
+  saveCfg();         // lokaler Cache
+  applyConfig();
+  anzeigen();        // Tabelle neu rendern, damit die Card-Darstellung wechselt
+  // Server-seitig speichern, damit die Werte für ALLE Geräte gelten
+  try {
+    await api.saveConfig({
+      revier:       config.revier,
+      code:         config.code,
+      abfallText:   config.abfallText,
+      planVisible:  config.planVisible  ? "1" : "0",
+      cardsCompact: config.cardsCompact ? "1" : "0",
+      parkVisible:  config.parkVisible  ? "1" : "0",
+    });
+    toast("✓ Einstellungen gespeichert");
+  } catch (err) {
+    toast("⚠ Lokal gespeichert, Server-Speichern fehlgeschlagen: " + err.message, "warn");
+  }
 }
 
 async function changePassword() {
