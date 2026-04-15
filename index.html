@@ -646,6 +646,41 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 .meld-table td:first-child { text-align: left; }
 .meld-table td:last-child { text-align: right; }
 
+/* Hilfe-Popup: kompakte Accordion-Struktur */
+.help-sections details.help-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: #fafafa;
+}
+.help-sections details.help-section > summary {
+  list-style: none;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+}
+.help-sections details.help-section > summary::-webkit-details-marker { display: none; }
+.help-sections details.help-section > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--grau);
+  transition: transform 0.15s;
+}
+.help-sections details.help-section[open] > summary::before { transform: rotate(90deg); }
+.help-sections .help-body {
+  padding: 2px 14px 12px 28px;
+  font-size: 13px;
+  color: #333;
+  line-height: 1.45;
+}
+.help-sections .help-body ul,
+.help-sections .help-body ol { padding-left: 18px; margin: 6px 0; }
+.help-sections .help-body code {
+  background: #eceff1; padding: 1px 5px; border-radius: 3px; font-size: 12px;
+}
+
 /* Revier-Header (kompakter Titel im Revier- und Park-Modus) */
 .revier-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -1764,120 +1799,199 @@ function openHelp() {
   box.style.cssText =
     "position:fixed;left:4%;right:4%;top:3vh;" +
     "max-height:94vh;overflow-y:auto;" +
-    "background:#fff;padding:18px;border-radius:12px;" +
+    "background:#fff;padding:16px 18px;border-radius:12px;" +
     "box-shadow:0 10px 40px rgba(0,0,0,0.4);" +
     "z-index:1000;display:block;" +
     "-webkit-overflow-scrolling:touch;";
   ov.onclick = () => { ov.remove(); box.remove(); };
   box.onclick = ev => ev.stopPropagation();
-  box.innerHTML = `
-    <h3>❓ Hilfe – Jagdrevier Prad</h3>
 
-    <h4>🎯 Neuen Eintrag anlegen</h4>
-    <p>Im Revier-Tab auf <b>➕ Neuer Eintrag</b>. Du gehst der Reihe nach
-    durch: Erleger → Wildart → Klasse → Gewicht → Ort → Zeit → Datum →
-    Verwendung → Zusammenfassung → Speichern. Datum und Uhrzeit sind immer
-    auf „jetzt" vorausgefüllt, du musst sie nur ändern, wenn nötig.</p>
+  const parkOn  = (config.parkVisible  !== false) || isAdmin;
+  const planOn  = (config.planVisible  !== false) || isAdmin;
 
-    <h4>📍 Ort setzen</h4>
-    <p>Drei Wege:</p>
-    <ul>
-      <li><b>📡 Jetzt hier</b>: per GPS deinen aktuellen Standort übernehmen
-          (funktioniert nur draußen mit Empfang und HTTPS).</li>
-      <li><b>🗺️ Karte öffnen</b>: Karte anzeigen, auf den Erlegungsort tippen,
-          OK.</li>
-      <li><b>Andere</b>: Ortsname frei eingeben, wenn es nicht in Prad war.</li>
-    </ul>
+  /* Jeder Abschnitt ist ein Objekt mit:
+       - key: eindeutiger Identifier
+       - icon, title
+       - content: HTML
+       - adminOnly: nur für Admin sichtbar
+       - show: optional, explizite Sichtbarkeits-Funktion */
+  const sections = [
+    {
+      icon: "🎯", title: "Neuen Eintrag anlegen",
+      content:
+        "Tippe auf den grünen <b>➕</b>-Button rechts unten in der Revier- " +
+        "oder Park-Liste. Du gehst der Reihe nach durch die Schritte: " +
+        "Erleger → Wildart → Klasse → Gewicht → Ort → Zeit → Datum → " +
+        "Verwendung → Zusammenfassung → Speichern. Datum und Uhrzeit " +
+        "sind auf „jetzt" vorausgefüllt."
+    },
+    {
+      icon: "📍", title: "Ort setzen",
+      content:
+        "<ul><li><b>📡 Jetzt hier</b> – per GPS dein aktueller Standort. " +
+        "Funktioniert nur mit HTTPS und GPS-Empfang.</li>" +
+        "<li><b>🗺️ Karte öffnen</b> – auf den Erlegungsort tippen und OK.</li>" +
+        "<li><b>Andere</b> – freier Ortsname, wenn nicht in Prad.</li></ul>"
+    },
+    {
+      icon: "❄️", title: "Kühlzelle",
+      content:
+        "Auf der Startseite siehst du, wie viele Tiere aktuell eingelagert " +
+        "und noch nicht entnommen sind – gruppiert nach Wildart. " +
+        "Revier- und Park-Einträge werden zusammen gezählt."
+    },
+    {
+      icon: "📊", title: "Stat-Kacheln als Filter",
+      content:
+        "Im Revier-/Park-Tab kannst du auf die farbigen Kacheln (z.B. " +
+        "„Rehwild 3") tippen – die Liste wird dann auf diese Wildart oder " +
+        "Klasse gefiltert. Nochmal tippen oder „Gesamt" → Filter aus."
+    },
+    {
+      icon: "🔍", title: "Suche",
+      content:
+        "In der Revier-/Park-Toolbar gibt es ein 🔍-Symbol. Ein Tap " +
+        "öffnet das Suchfeld, in dem du nach Name, Wildart, Klasse, " +
+        "Ort oder Verwendung suchen kannst."
+    },
+    {
+      icon: "🗺", title: "Karte",
+      content:
+        "Im ⋯ Mehr-Menü „Karte" tippen. Zeigt alle Abschüsse des aktuellen " +
+        "Jahres als farbige Punkte. Mit <b>🛰 Satellit</b> oben rechts " +
+        "schaltest du zwischen Karten- und Satellitenansicht um. Mit " +
+        "<b>📍 Mein Standort</b> springst du zu deiner aktuellen Position."
+    },
+    {
+      show: () => planOn,
+      icon: "📋", title: "Abschussplan (Popup)",
+      content:
+        "Im ⋯ Mehr-Menü „Plan" tippen. Zeigt das Monats-Balkendiagramm und " +
+        "die Plan/Ist/Extern/Rest-Tabelle. Rest-Formel: " +
+        "<code>Plan − Ist − Extern</code>. Fallwild wird nicht im Plan " +
+        "gezählt."
+    },
+    {
+      icon: "📴", title: "Offline-Modus",
+      content:
+        "Die App ist eine PWA: du kannst sie über das Browser-Menü als " +
+        "App auf dem Homescreen installieren. Sie funktioniert auch ohne " +
+        "Internet. Einträge ohne Empfang werden in einer Warteschlange " +
+        "gesammelt und automatisch hochgeladen, sobald das Netz wieder " +
+        "da ist. Ein orangener Banner zeigt den Offline-Status an."
+    },
+    {
+      icon: "🌡", title: "Wetter",
+      content:
+        "Wenn ein Abschuss mit GPS-Koordinaten gespeichert wird, lädt " +
+        "die App nach dem Speichern automatisch die Wetterlage zur " +
+        "Schusszeit (Temperatur, Wind, Niederschlag) nach und zeigt sie " +
+        "im Eintrag."
+    },
 
-    <h4>❄️ Kühlzelle</h4>
-    <p>Auf der Startseite siehst du, wie viele Tiere aktuell eingelagert und
-    noch nicht entnommen sind – gruppiert nach Wildart. Revier- und Park-
-    Einträge werden zusammen gezählt.</p>
+    /* -------- Admin-only Sektionen -------- */
+    {
+      adminOnly: true,
+      icon: "🔐", title: "Admin-Login",
+      content:
+        "Oben rechts der Button 🔐. Als Admin kannst du Einträge bearbeiten, " +
+        "löschen und sperren, den Abschussplan pflegen sowie drucken. " +
+        "Unter „Passwort ändern" kannst du dein Passwort neu setzen – das " +
+        "alte wird zur Bestätigung abgefragt."
+    },
+    {
+      adminOnly: true,
+      icon: "🔒", title: "Eintrag „gemeldet" sperren",
+      content:
+        "Gemeldete Einträge sind gegen Änderungen geschützt. Typischer " +
+        "Ablauf:<ol><li>Jäger trägt den Abschuss ein.</li>" +
+        "<li>Du reichst die Liste als PDF beim Jagdverband ein.</li>" +
+        "<li>Danach setzt du im Admin → Meldungen die Einträge auf 🔒, " +
+        "damit sie nicht mehr verändert werden können.</li></ol>" +
+        "Admin kann die Sperre jederzeit wieder aufheben."
+    },
+    {
+      adminOnly: true,
+      icon: "📋", title: "Abschussplan bearbeiten",
+      content:
+        "Im Admin → Plan. Kontext (🎯 Revier / 🌲 Park) wählen, Jahr " +
+        "wählen, pro Klasse: ✓ Haken = zählt, Plan = Sollzahl, Extern = " +
+        "von außerhalb angerechnete Abschüsse, „Zählt als" = optional " +
+        "mehrere Klassen zu einer Zeile zusammenfassen (Komma-getrennt)."
+    },
+    {
+      adminOnly: true,
+      icon: "☠", title: "Fallwild markieren",
+      content:
+        "Im Edit-Dialog eines Eintrags gibt es eine Checkbox „als " +
+        "Fallwild markieren". Fallwild wird NICHT im Plan gezählt, aber " +
+        "separat in den Stats und im Monats-Chart angezeigt."
+    },
+    {
+      adminOnly: true,
+      icon: "🖨", title: "Drucken / PDF + CSV-Export",
+      content:
+        "Im Admin → Export wählst du Bereich (Revier/Park) und Jahr. " +
+        "<b>🖨 Drucken / PDF</b> erstellt eine A4-Liste für die amtliche " +
+        "Meldung. <b>📊 CSV/Excel</b> liefert eine CSV-Datei zum Öffnen " +
+        "in Excel."
+    },
+    {
+      adminOnly: true,
+      icon: "💾", title: "Backup & Restore",
+      content:
+        "Im Admin → Export → „Backup der Datenbank". Das Backup ist ein " +
+        "JSON-Dump (ohne Passwörter). Beim Einspielen werden alle Daten " +
+        "überschrieben – vorher also immer ein aktuelles Backup machen."
+    },
+    {
+      adminOnly: true,
+      icon: "⚙️", title: "Einstellungen",
+      content:
+        "Im Admin → Allgemein kannst du Reviername, Zahlencode, " +
+        "Abfall-Hinweistext, Sichtbarkeit von Plan/Park-Button und " +
+        "kompakte vs. detaillierte Kartenansicht einstellen. Die " +
+        "Einstellungen liegen in der Datenbank und gelten für alle Geräte."
+    },
+  ];
 
-    <h4>📊 Statistik-Kacheln als Filter</h4>
-    <p>Im Revier-Tab kannst du auf „Rehwild 3", „Rotwild 2" usw. klicken –
-    die Tabelle zeigt dann nur diese Wildart. Nochmal klicken oder auf
-    „Gesamt" → Filter aus.</p>
+  // Filtern nach Admin-Status und Konfig
+  const visibleSections = sections.filter(s => {
+    if (s.adminOnly && !isAdmin) return false;
+    if (typeof s.show === "function" && !s.show()) return false;
+    return true;
+  });
 
-    <h4>🔒 Eintrag „gemeldet" sperren</h4>
-    <p>Gemeldete Einträge sind gegen versehentliche Änderungen geschützt.
-    Typischer Ablauf:</p>
-    <ol>
-      <li>Jäger trägt den Abschuss ein (offen, bearbeitbar).</li>
-      <li>Ende des Monats / Quartals reichst du die Liste als PDF beim
-          Jagdverband ein (🖨 Drucken im Admin-Panel).</li>
-      <li>Danach setzt du im Admin unter „Einträge gemeldet markieren"
-          bei allen gemeldeten Einträgen 🔒. Dadurch kann niemand mehr
-          aus Versehen Entnahme, Abfall oder Verwendung dieser Einträge
-          ändern.</li>
-      <li>Nur der Admin kann die Sperre wieder aufheben oder den Eintrag
-          weiterhin bearbeiten.</li>
-    </ol>
-    <p>So bleibt dokumentiert: „was wurde offiziell gemeldet" vs. „was ist
-    noch im Fluss".</p>
+  const modusInfo = isAdmin
+    ? '<span style="background:#e8f5e9;color:#1b5e20;padding:2px 8px;border-radius:12px;font-size:11px;">Admin-Ansicht</span>'
+    : '<span style="background:#e3f2fd;color:#0d47a1;padding:2px 8px;border-radius:12px;font-size:11px;">Benutzer-Ansicht</span>';
 
-    <h4>📋 Abschussplan</h4>
-    <p>Im Admin unter „Abschussplan bearbeiten":</p>
-    <ul>
-      <li>Pro Wildart gibt es eine Tabelle mit Klassen.</li>
-      <li>Das Häkchen <b>✓</b> bestimmt, ob eine Klasse im Plan-Popup angezeigt
-          und gezählt wird. Deaktivierte Klassen bleiben gespeichert, werden
-          aber ignoriert.</li>
-      <li><b>Plan</b> = die Sollzahl vom Jagdbezirk.</li>
-      <li><b>Zählt als</b> = optional. Gibt an, welche Wild-Klassen in diese
-          Zeile als Ist-Wert einfließen. Mehrere durch <b>Komma</b> trennen.
-          Beispiel: eine Zeile „Männlich" mit <code>T-Hirsch,J-Hirsch</code>
-          zählt beide Klassen zusammen.</li>
-      <li><b>+ Klasse</b> fügt eine Zeile hinzu, <b>+ neue Wildart</b> eine
-          komplette Gruppe (z.B. Schwarzwild).</li>
-      <li>Das ✕ am Zeilenende löscht eine Zeile.</li>
-      <li>Nach dem Bearbeiten auf <b>💾 Plan speichern</b>.</li>
-    </ul>
-
-    <h4>🖨 Drucken / PDF-Export</h4>
-    <p>Im Admin unter „Daten exportieren / drucken" wählst du ein Jahr und
-    klickst auf <b>🖨 Drucken / PDF</b>. Es erscheint eine querformatige
-    A4-Liste für die amtliche Meldung. Im Browser-Druck-Dialog kannst du
-    entweder echt drucken oder „Als PDF speichern".</p>
-    <p>Alternativ liefert <b>📊 CSV/Excel</b> eine CSV-Datei zum Öffnen in
-    Excel.</p>
-
-    <h4>🗺️ Karte</h4>
-    <p>Im Revier-Tab auf <b>🗺️ Karte</b>. Zeigt alle Abschüsse des aktuell
-    gewählten Jahres als farbige Punkte auf OpenStreetMap. Mit <b>📍 Mein
-    Standort</b> kannst du zu deiner aktuellen Position springen.</p>
-    <p>Einzelne Einträge kannst du in der Tabelle über den Ortsnamen-Link
-    direkt auf der Karte ansehen.</p>
-
-    <h4>🔐 Admin-Login</h4>
-    <p>Oben rechts der Button 🔐. Standard: Benutzer <code>admin</code>,
-    Passwort <code>1234</code>. Unter „Passwort ändern" kannst du es ändern –
-    das alte Passwort wird zur Bestätigung nochmal abgefragt.</p>
-    <p>Ohne Admin-Login kann jeder Einträge anlegen, Entnahme und Abfall
-    setzen. Nur Admin kann <b>bearbeiten, löschen, sperren, Plan pflegen</b>
-    und <b>drucken</b>.</p>
-
-    <h4>📴 Offline-Modus</h4>
-    <p>Die App ist als PWA gebaut: installierbar auf dem Handy-Startbildschirm
-    („Zum Startbildschirm hinzufügen" im Browser-Menü), und funktioniert auch
-    ohne Internet. Einträge, die offline angelegt werden, landen in einer
-    Warteschlange und werden automatisch hochgeladen, sobald wieder Empfang
-    da ist. Ein orangener Banner unten zeigt das an.</p>
-
-    <h4>🌡️ Wetter</h4>
-    <p>Wenn der Abschussort per GPS oder Karte gesetzt ist, holt die App nach
-    dem Speichern automatisch die Wetterlage (Temperatur, Wind) für den
-    Schusszeitpunkt von Open-Meteo und hängt sie an den Eintrag.</p>
-
-    <div style="margin-top:16px;text-align:right;">
-      <button onclick="this.closest('div').parentElement.remove();
-                       this.closest('div').parentElement.nextElementSibling &&
-                       this.closest('div').parentElement.nextElementSibling.remove()">Schließen</button>
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h3 style="margin:0;">❓ Hilfe</h3>
+      ${modusInfo}
     </div>
-  `;
-  // Einfacherer Schließen-Handler: ersetze den komplizierten onclick oben
-  const schliessen = box.querySelector('button[onclick*="remove"]');
-  if (schliessen) schliessen.onclick = () => { ov.remove(); box.remove(); };
+    <p class="hint" style="margin-bottom:10px;">
+      Tippe auf einen Abschnitt, um ihn aufzuklappen.
+    </p>
+    <div class="help-sections">`;
+
+  visibleSections.forEach(s => {
+    html += `
+      <details class="help-section">
+        <summary>${s.icon} <b>${esc(s.title)}</b></summary>
+        <div class="help-body">${s.content}</div>
+      </details>`;
+  });
+
+  html += `
+    </div>
+    <div style="margin-top:14px;text-align:right;">
+      <button id="helpCloseBtn">Schließen</button>
+    </div>`;
+
+  box.innerHTML = html;
+  box.querySelector("#helpCloseBtn").onclick = () => { ov.remove(); box.remove(); };
   document.body.appendChild(ov);
   document.body.appendChild(box);
 }
