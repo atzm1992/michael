@@ -1913,8 +1913,13 @@ async function openPlanPopup() {
 /* Jahres-Balkendiagramm: Anzahl Einträge pro Monat, gestapelt nach Wildart */
 function renderMonthChart(entries, year) {
   const MONATE = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
-  // Bekannte Wildarten mit festen Farben (konsistent mit den Kartenmarkern).
+  const isPark = (appMode === "park");
+  // Bekannte Wildarten / Klassen mit festen Farben.
+  // Im Park-Modus gruppieren wir nach Klasse (T-Hirsch ...), daher
+  // brauchen wir die Klassen-Farben auch hier. Konsistent mit den
+  // Karten-Markern.
   const FARBEN = {
+    // Revier-Wildarten
     "Rehwild":    "#FFD600",
     "Rotwild":    "#E53935",
     "Gamswild":   "#424242",
@@ -1923,6 +1928,13 @@ function renderMonthChart(entries, year) {
     "Schwarzwild":"#6D4C41",
     "Murmeltier": "#00897B",
     "Steinbock":  "#8BC34A",
+    // Park-Klassen (Rotwild)
+    "T-Hirsch":   "#8E0000",
+    "J-Hirsch":   "#FF6D00",
+    "Tier":       "#E91E63",
+    "Schmaltier": "#AB47BC",
+    "Kalb":       "#FFEB3B",
+    // Sonstige
     "Fallwild":   "#9C27B0",   // Fallwild als eigene Kategorie
     "Andere":     "#1E88E5",
   };
@@ -1940,11 +1952,20 @@ function renderMonthChart(entries, year) {
   }
 
   // Pro Monat pro Kategorie zählen. Fallwild ist eine eigene
-  // Kategorie, damit es im Chart unterscheidbar ist.
+  // Kategorie, damit es im Chart unterscheidbar ist. Im Park-Modus
+  // wird nach Klasse (T-Hirsch, J-Hirsch, ...) gruppiert, im Revier
+  // nach Wildart.
   const months = Array.from({length: 12}, () => ({}));
   entries.forEach(d => {
     const m = new Date(d.datum).getMonth();
-    const a = d.ist_fallwild ? "Fallwild" : (d.wildart || "Andere");
+    let a;
+    if (d.ist_fallwild) {
+      a = "Fallwild";
+    } else if (isPark) {
+      a = d.wild || "–";
+    } else {
+      a = d.wildart || "Andere";
+    }
     months[m][a] = (months[m][a] || 0) + 1;
   });
   const totals = months.map(m => Object.values(m).reduce((s,n) => s+n, 0));
@@ -1984,10 +2005,17 @@ function renderMonthChart(entries, year) {
 
   html += '</svg>';
 
-  // Legende zeigt alle tatsächlich vorkommenden Kategorien (inkl. Fallwild)
+  // Legende zeigt alle tatsächlich vorkommenden Kategorien (inkl. Fallwild).
+  // Dieselbe Gruppierung wie im Chart: Park -> nach Klasse, Revier -> nach Wildart
   const wildarten = new Set();
   entries.forEach(d => {
-    wildarten.add(d.ist_fallwild ? "Fallwild" : (d.wildart || "Andere"));
+    if (d.ist_fallwild) {
+      wildarten.add("Fallwild");
+    } else if (isPark) {
+      wildarten.add(d.wild || "–");
+    } else {
+      wildarten.add(d.wildart || "Andere");
+    }
   });
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin-top:4px;">';
   [...wildarten].sort().forEach(a => {
