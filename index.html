@@ -462,23 +462,33 @@ tr:hover { background: var(--gruen-l); }
 .bottom-nav button.active { color: var(--gruen-d); background: #e8f5e9; }
 .bottom-nav .bn-icon { font-size: 22px; line-height: 1; }
 .bottom-nav .bn-lbl { white-space: nowrap; }
-.bottom-nav .bn-fab {
-  flex: 0 0 auto;
-  width: 58px; height: 58px;
+/* Floating Action Button (Neuer Eintrag).
+   Schwebt rechts unten direkt über der Bottom-Nav. */
+.floating-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 80px;  /* über der Bottom-Nav */
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
   background: var(--gruen) !important;
   color: #fff !important;
-  font-size: 30px !important;
-  box-shadow: 0 4px 14px rgba(46,125,50,0.45);
-  transform: translateY(-16px);
+  font-size: 32px !important;
+  line-height: 62px;
+  text-align: center;
   padding: 0;
-  flex-direction: row;
-  justify-content: center;
+  border: none;
+  box-shadow: 0 6px 18px rgba(46,125,50,0.45);
+  z-index: 920;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s;
 }
-.bottom-nav .bn-fab:hover { background: var(--gruen-d) !important; }
-/* FAB wird per JS nur in Revier/Park eingeblendet. Hier eine defensive
-   Regel, falls irgendwo eine andere CSS-Kaskade reinfunkt. */
-.bottom-nav.no-fab .bn-fab { display: none !important; }
+.floating-fab:hover {
+  background: var(--gruen-d) !important;
+  box-shadow: 0 8px 24px rgba(46,125,50,0.55);
+}
+.floating-fab:active { transform: scale(0.95); }
 
 /* Platz für Bottom-Nav schaffen, damit der letzte Inhalt nicht darunter verschwindet */
 body.has-bottom-nav .container { padding-bottom: 90px; }
@@ -667,9 +677,6 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   <button data-page="revier" onclick="bnGo('revier')">
     <span class="bn-icon">🎯</span><span class="bn-lbl">Revier</span>
   </button>
-  <button class="bn-fab" onclick="bnNewEntry()" title="Neuer Eintrag" style="display:none;">
-    <span class="bn-icon">➕</span>
-  </button>
   <button data-page="park" onclick="bnGo('park')">
     <span class="bn-icon">🌲</span><span class="bn-lbl">Park</span>
   </button>
@@ -677,6 +684,11 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     <span class="bn-icon">⋯</span><span class="bn-lbl">Mehr</span>
   </button>
 </nav>
+
+<!-- Floating Action Button (Neuer Eintrag) - schwebt rechts unten
+     über der Bottom-Nav. Nur in Revier/Park sichtbar. -->
+<button id="floatingFab" class="floating-fab" onclick="bnNewEntry()"
+        title="Neuer Eintrag" style="display:none;">➕</button>
 
 <div class="container">
 
@@ -3239,14 +3251,12 @@ function updateBottomNav() {
   nav.style.display = hidden ? "none" : "flex";
   document.body.classList.toggle("has-bottom-nav", !hidden);
 
-  // FAB nur anzeigen, wenn wir in der Revier- oder Park-Liste sind -
-  // sonst wüsste der User nicht, in welchem Bereich der Eintrag
-  // angelegt wird. Doppelt abgesichert per CSS-Klasse UND
-  // inline-style.
-  const showFab = (pageId === "revier");
-  nav.classList.toggle("no-fab", !showFab);
-  const fab = nav.querySelector(".bn-fab");
-  if (fab) fab.style.display = showFab ? "flex" : "none";
+  // Floating FAB (Neuer Eintrag) nur in Revier/Park sichtbar.
+  const fab = document.getElementById("floatingFab");
+  if (fab) {
+    const showFab = (pageId === "revier");
+    fab.style.display = showFab ? "block" : "none";
+  }
 
   // Aktiven Button markieren
   nav.querySelectorAll("button[data-page]").forEach(btn => {
