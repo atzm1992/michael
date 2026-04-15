@@ -150,8 +150,11 @@ input:focus, select:focus, textarea:focus {
 /* Admin-Button oben rechts (immer sichtbar) */
 .admin-fab {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: 20px;
+  /* Rechter Abstand: auf breiten Screens am Container-Rand (max-width
+     900px, also 450px von der Mitte), auf schmalen Screens 12px vom
+     Viewport-Rand. Die max()-Funktion nimmt den größeren Wert. */
+  right: max(12px, calc(50vw - 450px + 24px));
   z-index: 900;
   width: 42px;
   height: 42px;
@@ -463,32 +466,40 @@ tr:hover { background: var(--gruen-l); }
 .bottom-nav .bn-icon { font-size: 22px; line-height: 1; }
 .bottom-nav .bn-lbl { white-space: nowrap; }
 /* Floating Action Button (Neuer Eintrag).
-   Schwebt rechts unten direkt über der Bottom-Nav. */
+   Schwebt rechts oberhalb der Bottom-Nav als eigenständiger Kreis.
+   Die right-Formel mit max() sorgt dafür, dass der Button auf breiten
+   Bildschirmen am Container-Rand sitzt (max-width 900px), nicht am
+   Viewport-Rand im grünen Hintergrund. */
 .floating-fab {
-  position: fixed;
-  right: 16px;
-  bottom: 80px;  /* über der Bottom-Nav */
-  bottom: calc(80px + env(safe-area-inset-bottom));
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
+  position: fixed !important;
+  right: max(18px, calc(50vw - 450px + 24px)) !important;
+  /* Höhe der Bottom-Nav (~60px) + Abstand (~30px) + safe-area */
+  bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: 62px !important;
+  height: 62px !important;
+  border-radius: 50% !important;
   background: var(--gruen) !important;
   color: #fff !important;
-  font-size: 32px !important;
-  line-height: 62px;
+  font-size: 30px !important;
+  line-height: 62px !important;
   text-align: center;
-  padding: 0;
-  border: none;
-  box-shadow: 0 6px 18px rgba(46,125,50,0.45);
-  z-index: 920;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  box-shadow: 0 6px 18px rgba(46,125,50,0.45) !important;
+  z-index: 920 !important;
   cursor: pointer;
+  flex: none !important;
   transition: transform 0.1s, box-shadow 0.15s;
 }
 .floating-fab:hover {
   background: var(--gruen-d) !important;
-  box-shadow: 0 8px 24px rgba(46,125,50,0.55);
+  box-shadow: 0 8px 24px rgba(46,125,50,0.55) !important;
 }
-.floating-fab:active { transform: scale(0.95); }
+.floating-fab:active { transform: scale(0.95) !important; }
 
 /* Platz für Bottom-Nav schaffen, damit der letzte Inhalt nicht darunter verschwindet */
 body.has-bottom-nav .container { padding-bottom: 90px; }
