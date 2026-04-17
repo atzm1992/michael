@@ -1,4 +1,4 @@
-name: Deploy to Namecheap (Jagdrevier Prad)
+name: Deploy Jagdrevier Prad
 
 # Triggert bei Push auf main – und manuell aus der Actions-Oberfläche.
 # Die FTP-Zugangsdaten kommen aus GitHub-Secrets und sind NICHT in dieser Datei.
@@ -50,8 +50,7 @@ jobs:
           password: ${{ secrets.FTP_PASS }}
           protocol: ftps
           port: 21
-          # Namecheap FTP-User mit Domain-Scope landen direkt im
-          # Dokumenten-Root der Subdomain, daher "/".
+          # FTP-User landet im Dokumenten-Root der Subdomain → "/".
           # Falls nicht, in GitHub-Secret FTP_DIR einen Pfad setzen.
           server-dir: ${{ secrets.FTP_DIR || '/' }}
           # Was NICHT hochgeladen werden soll:
