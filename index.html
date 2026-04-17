@@ -744,7 +744,7 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     <img src="logo.jpg"
          alt="Jagdrevier Prad" onerror="this.style.display='none'" id="logoImg">
     <h2>Abschussliste<br>Jagdrevier Prad</h2>
-    <div class="code">Zahlencode: </div>
+    <div class="code" style="visibility:hidden;">Zahlencode:</div>
   </div>
 
   <!-- Wildkammer-Übersicht: was aktuell eingelagert ist -->
@@ -1513,6 +1513,11 @@ function fillExportYears() {
 }
 
 async function init() {
+  // Cached Werte aus localStorage sofort anwenden, damit die Seite
+  // nicht kurz den alten Platzhalter-Code "1024" anzeigt bevor die
+  // async-Calls fertig sind.
+  applyConfig();
+
   const sel = document.getElementById("inputGewicht");
   sel.innerHTML = "";
   // Platzhalter, damit 0 kg nicht aus Versehen als Default ausgewählt ist.
@@ -1563,7 +1568,11 @@ function applyConfig() {
   document.querySelectorAll('.header h2')[0].innerHTML = 'Abschussliste<br>' + esc(config.revier);
   // revierTitle wird von updateRevierHeader() verwaltet
   if (typeof updateRevierHeader === "function") updateRevierHeader();
-  document.querySelector('.header .code').textContent = 'Zahlencode: ' + config.code;
+  const codeEl = document.querySelector('.header .code');
+  if (codeEl) {
+    codeEl.textContent = 'Zahlencode: ' + config.code;
+    codeEl.style.visibility = 'visible';
+  }
 
   // Admin indicator
   document.getElementById("adminIndicator").style.display = isAdmin ? "block" : "none";
@@ -2445,11 +2454,33 @@ function neuerEintrag() {
   zeigeSeite("wf-name");
 }
 
+/* Merkt einen verwendeten Namen lokal (pro Gerät) für die Autocomplete-
+   Vorschläge. Neueste zuerst, max. 8 Einträge. */
+function rememberNameLocally(name) {
+  if (!name) return;
+  name = String(name).trim();
+  if (!name) return;
+  let list = [];
+  try {
+    list = JSON.parse(localStorage.getItem("myNames") || "[]");
+    if (!Array.isArray(list)) list = [];
+  } catch (_) { list = []; }
+  // Ohne Dubletten, aktueller Name nach vorne
+  list = [name, ...list.filter(n => n !== name)].slice(0, 8);
+  try { localStorage.setItem("myNames", JSON.stringify(list)); } catch (_) {}
+}
+
 function buildNameSugg() {
-  const names = [...new Set(daten.map(d => d.name).filter(Boolean))];
+  // Vorschläge kommen NUR aus dem lokalen Speicher dieses Geräts,
+  // damit nicht jeder Benutzer die Namen aller anderen sieht.
+  let names = [];
+  try {
+    names = JSON.parse(localStorage.getItem("myNames") || "[]");
+    if (!Array.isArray(names)) names = [];
+  } catch (_) { names = []; }
   const c = document.getElementById("nameSuggestions");
   c.innerHTML = "";
-  names.slice(0,8).forEach(n => {
+  names.slice(0, 8).forEach(n => {
     const b = document.createElement("button");
     b.className = "sm sec"; b.textContent = n;
     b.onclick = () => { document.getElementById("inputName").value = n; nextWild(); };
@@ -2657,6 +2688,8 @@ async function finishSave() {
   e.entnommen = null;
   e.abfall = null;
   e.gemeldet = false;
+  // Namen lokal für Autocomplete merken (neueste zuerst, max 8)
+  rememberNameLocally(e.name);
   const body = clientToDb(e);
   try {
     // Wenn offline: direkt in Outbox, ohne API-Versuch
