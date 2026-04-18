@@ -821,7 +821,7 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     <img src="logo.jpg"
          alt="Jagdrevier Prad" onerror="this.style.display='none'" id="logoImg">
     <h2>Abschussliste<br>Jagdrevier Prad</h2>
-    <div class="code" style="visibility:hidden;">Zahlencode:</div>
+    <div class="code" style="visibility:hidden;"></div>
   </div>
 
   <!-- Wildkammer-Übersicht: was aktuell eingelagert ist -->
@@ -1880,10 +1880,17 @@ function applyConfig() {
   document.querySelectorAll('.header h2')[0].innerHTML = 'Abschussliste<br>' + esc(config.revier);
   // revierTitle wird von updateRevierHeader() verwaltet
   if (typeof updateRevierHeader === "function") updateRevierHeader();
+  // Zahlencode NUR für eingeloggte Benutzer sichtbar (interne Info).
   const codeEl = document.querySelector('.header .code');
   if (codeEl) {
-    codeEl.textContent = 'Zahlencode: ' + config.code;
-    codeEl.style.visibility = 'visible';
+    const loggedIn = !!(currentUserData && currentUserData.logged_in !== false && currentUser);
+    if (loggedIn) {
+      codeEl.textContent = 'Zahlencode: ' + config.code;
+      codeEl.style.visibility = 'visible';
+    } else {
+      codeEl.textContent = '';
+      codeEl.style.visibility = 'hidden';
+    }
   }
 
   // Admin indicator
@@ -2160,26 +2167,55 @@ function openHelp() {
   ov.onclick = () => { ov.remove(); box.remove(); };
   box.onclick = ev => ev.stopPropagation();
 
-  const parkOn  = (config.parkVisible  !== false) || isAdmin;
-  const planOn  = (config.planVisible  !== false) || isAdmin;
+  // Rechte des aktuellen Benutzers abfragen (mit Fallbacks)
+  const r          = (typeof userRechte === "object" && userRechte) ? userRechte : {};
+  const canRevier  = isAdmin || r.revier  === true;
+  const canPark    = isAdmin || r.park    === true;
+  const canPlanEd  = isAdmin || r.plan_revier === true || r.plan_park === true;
+  const planOn     = canRevier || canPark; // Plan-Button ist im Mehr-Menü sichtbar
+  const nameSichtb = !!r.name_sichtbar;
+  const nameVerb   = !!r.name_verbergen;
+  const lesenAll   = !!r.lesen;
 
   /* Jeder Abschnitt ist ein Objekt mit:
-       - key: eindeutiger Identifier
        - icon, title
        - content: HTML
        - adminOnly: nur für Admin sichtbar
        - show: optional, explizite Sichtbarkeits-Funktion */
   const sections = [
     {
-      icon: "🎯", title: "Neuen Eintrag anlegen",
+      icon: "🔐", title: "Anmeldung & Konto",
       content:
-        "Tippe auf den grünen <b>➕</b>-Button rechts unten in der Revier- " +
-        "oder Park-Liste. Du gehst der Reihe nach durch die Schritte: " +
-        "Erleger → Wildart → Klasse → Gewicht → Ort → Zeit → Datum → " +
-        "Verwendung → Zusammenfassung → Speichern. Datum und Uhrzeit " +
-        "sind auf &bdquo;jetzt&rdquo; vorausgefüllt."
+        "Die App ist nur für angemeldete Benutzer zugänglich. " +
+        "Neue Jäger können sich über den Button <b>&bdquo;Registrieren&ldquo;</b> auf " +
+        "der Login-Seite ein Konto anlegen (Vorname, Nachname, E-Mail, " +
+        "Telefon, Benutzername, Passwort). Nach der Registrierung bist " +
+        "du automatisch angemeldet. Neue Konten haben Basisrechte " +
+        "(Zugriff auf Revier, Namen sichtbar). Der Admin kann weitere " +
+        "Rechte freischalten (z.&nbsp;B. Park-Zugriff, Plan bearbeiten)."
     },
     {
+      icon: "👤", title: "Profil & Passwort ändern",
+      content:
+        "Im ⋯ Mehr-Menü &bdquo;Profil&ldquo; tippen. Dort siehst du deinen Namen, " +
+        "Benutzernamen und die E-Mail, und kannst dein Passwort ändern " +
+        "(altes + neues Passwort, mind. 6 Zeichen). Mit <b>&bdquo;Abmelden&ldquo;</b> " +
+        "loggst du dich aus – danach musst du dich neu anmelden."
+    },
+    {
+      show: () => canRevier || canPark,
+      icon: "🎯", title: "Neuen Eintrag anlegen",
+      content:
+        "Tippe auf den grünen <b>➕</b>-Button rechts unten in der " +
+        (canRevier && canPark ? "Revier- oder Park-Liste" :
+         canPark ? "Park-Liste" : "Revier-Liste") + ". " +
+        "Dein Name wird automatisch als Erleger eingetragen. Dann gehst " +
+        "du der Reihe nach durch: Wildart → Klasse → Gewicht → Ort → " +
+        "Zeit → Datum → Verwendung → Zusammenfassung → Speichern. Datum " +
+        "und Uhrzeit sind auf &bdquo;jetzt&rdquo; vorausgefüllt."
+    },
+    {
+      show: () => canRevier || canPark,
       icon: "📍", title: "Ort setzen",
       content:
         "<ul><li><b>📡 Jetzt hier</b> – per GPS dein aktueller Standort. " +
@@ -2195,6 +2231,7 @@ function openHelp() {
         "Revier- und Park-Einträge werden zusammen gezählt."
     },
     {
+      show: () => canRevier || canPark,
       icon: "📊", title: "Stat-Kacheln als Filter",
       content:
         "Im Revier-/Park-Tab kannst du auf die farbigen Kacheln (z.B. " +
@@ -2202,6 +2239,7 @@ function openHelp() {
         "Klasse gefiltert. Nochmal tippen oder &bdquo;Gesamt&ldquo; → Filter aus."
     },
     {
+      show: () => canRevier || canPark,
       icon: "🔍", title: "Suche",
       content:
         "In der Revier-/Park-Toolbar gibt es ein 🔍-Symbol. Ein Tap " +
@@ -2209,6 +2247,7 @@ function openHelp() {
         "Ort oder Verwendung suchen kannst."
     },
     {
+      show: () => canRevier || canPark,
       icon: "🗺", title: "Karte",
       content:
         "Im ⋯ Mehr-Menü &bdquo;Karte&ldquo; tippen. Zeigt alle Abschüsse des aktuellen " +
@@ -2226,6 +2265,40 @@ function openHelp() {
         "gezählt."
     },
     {
+      icon: "👁️", title: "Namens-Sichtbarkeit",
+      content:
+        "Je nach Rechten siehst du die Namen der anderen Jäger:" +
+        "<ul>" +
+        (isAdmin || lesenAll
+          ? "<li><b>Du siehst ALLE Namen</b> (" + (isAdmin ? "Admin" : "Leserechte") + ").</li>"
+          : nameVerb
+            ? "<li><b>Du hast &bdquo;Namen verbergen&ldquo;</b>: Dein Name wird " +
+              "anderen nicht gezeigt, und du siehst selbst keine anderen " +
+              "Namen (stattdessen „---").</li>"
+            : nameSichtb
+              ? "<li><b>Du hast &bdquo;Namen sichtbar&ldquo;</b>: Du siehst die " +
+                "Namen anderer Jäger, die ebenfalls &bdquo;sichtbar&ldquo; sind. " +
+                "Jäger mit &bdquo;Namen verbergen&ldquo; erscheinen als „---".</li>"
+              : "<li>Deine Name-Berechtigung ist eingeschränkt. Du siehst " +
+                "nur deinen eigenen Namen. Bitte den Admin um Freischaltung.</li>"
+        ) +
+        "<li>Dein eigener Eintrag zeigt dir immer deinen Namen.</li>" +
+        "</ul>"
+    },
+    {
+      icon: "⚖️", title: "Deine Rechte",
+      content:
+        "<ul>" +
+        "<li>" + (canRevier ? "✅" : "⛔") + " Zugriff auf Revier</li>" +
+        "<li>" + (canPark   ? "✅" : "⛔") + " Zugriff auf Park</li>" +
+        "<li>" + (r.plan_revier || isAdmin ? "✅" : "⛔") + " Plan bearbeiten Revier</li>" +
+        "<li>" + (r.plan_park   || isAdmin ? "✅" : "⛔") + " Plan bearbeiten Park</li>" +
+        "<li>" + (lesenAll  || isAdmin ? "✅" : "⛔") + " Leserechte (alle Namen sichtbar)</li>" +
+        "<li>" + (isAdmin ? "✅" : "⛔") + " Admin-Rechte</li>" +
+        "</ul>" +
+        "Fehlt dir ein Recht, bitte den Admin um Freischaltung."
+    },
+    {
       icon: "📴", title: "Offline-Modus",
       content:
         "Die App ist eine PWA: du kannst sie über das Browser-Menü als " +
@@ -2235,6 +2308,7 @@ function openHelp() {
         "da ist. Ein orangener Banner zeigt den Offline-Status an."
     },
     {
+      show: () => canRevier || canPark,
       icon: "🌡", title: "Wetter",
       content:
         "Wenn ein Abschuss mit GPS-Koordinaten gespeichert wird, lädt " +
@@ -2242,16 +2316,29 @@ function openHelp() {
         "Schusszeit (Temperatur, Wind, Niederschlag) nach und zeigt sie " +
         "im Eintrag."
     },
+    {
+      icon: "📄", title: "Impressum & Datenschutz",
+      content:
+        "Im ⋯ Mehr-Menü &bdquo;Impressum & Datenschutz&ldquo;. Dort findest du " +
+        "die rechtlichen Angaben zum Jagdrevier und die Datenschutz­" +
+        "erklärung gemäß DSGVO (Art. 15–21) und italienischem " +
+        "Datenschutzgesetz. Kontakt für Datenschutzanfragen ist der " +
+        "Revierleiter."
+    },
 
     /* -------- Admin-only Sektionen -------- */
     {
       adminOnly: true,
-      icon: "🔐", title: "Admin-Login",
+      icon: "👥", title: "Benutzerverwaltung (Admin)",
       content:
-        "Oben rechts der Button 🔐. Als Admin kannst du Einträge bearbeiten, " +
-        "löschen und sperren, den Abschussplan pflegen sowie drucken. " +
-        "Unter &bdquo;Passwort ändern&ldquo; kannst du dein Passwort neu setzen – das " +
-        "alte wird zur Bestätigung abgefragt."
+        "Im Admin → 👥 Benutzer siehst du alle registrierten Benutzer. " +
+        "Klick auf einen Benutzer öffnet das Bearbeiten-Popup:<ul>" +
+        "<li><b>Rechte-Toggles</b>: Zugriff Revier/Park, Namen sichtbar/" +
+        "verbergen, Plan bearbeiten, Leserechte, Admin-Rechte.</li>" +
+        "<li><b>Aktiv/Inaktiv</b>: Deaktivierte Konten können sich nicht " +
+        "mehr einloggen, bleiben aber in der Datenbank.</li>" +
+        "<li><b>Passwort zurücksetzen</b>: Admin vergibt ein neues " +
+        "Passwort ohne altes Passwort abzufragen.</li></ul>"
     },
     {
       adminOnly: true,
@@ -2295,7 +2382,8 @@ function openHelp() {
       icon: "💾", title: "Backup & Restore",
       content:
         "Im Admin → Export → &bdquo;Backup der Datenbank&ldquo;. Das Backup ist ein " +
-        "JSON-Dump (ohne Passwörter). Beim Einspielen werden alle Daten " +
+        "JSON-Dump (Einträge, Plan, Config, Benutzerprofile – <b>ohne " +
+        "Passwort-Hashes</b>). Beim Einspielen werden alle Daten " +
         "überschrieben – vorher also immer ein aktuelles Backup machen."
     },
     {
@@ -2309,16 +2397,26 @@ function openHelp() {
     },
   ];
 
-  // Filtern nach Admin-Status und Konfig
+  // Filtern nach Admin-Status und Rechten
   const visibleSections = sections.filter(s => {
     if (s.adminOnly && !isAdmin) return false;
     if (typeof s.show === "function" && !s.show()) return false;
     return true;
   });
 
-  const modusInfo = isAdmin
-    ? '<span style="background:#e8f5e9;color:#1b5e20;padding:2px 8px;border-radius:12px;font-size:11px;">Admin-Ansicht</span>'
-    : '<span style="background:#e3f2fd;color:#0d47a1;padding:2px 8px;border-radius:12px;font-size:11px;">Benutzer-Ansicht</span>';
+  // Rechte-Badge für den Kopf
+  const rolle = isAdmin ? "Admin" :
+                lesenAll ? "Benutzer + Leserechte" :
+                (canPark && canRevier) ? "Benutzer Revier+Park" :
+                canPark  ? "Benutzer Park" :
+                canRevier ? "Benutzer Revier" :
+                "Benutzer (eingeschränkt)";
+  const rolleColor = isAdmin
+    ? 'background:#e8f5e9;color:#1b5e20;'
+    : 'background:#e3f2fd;color:#0d47a1;';
+  const modusInfo =
+    '<span style="' + rolleColor + 'padding:2px 8px;border-radius:12px;font-size:11px;">' +
+    esc(rolle) + '</span>';
 
   let html = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
