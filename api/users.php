@@ -165,10 +165,15 @@ if ($action === 'update') {
     $user = $user->fetch();
     if (!$user) jsonErr('Benutzer nicht gefunden', 404);
 
+    // Ist der Ziel-User ein Admin? Dann lassen wir seine Rechte und den
+    // aktiv-Status in Ruhe (Admin-Rechte sind unveränderlich), nur Profil
+    // darf geändert werden.
+    $targetIsAdmin = ($user['rolle'] ?? '') === 'admin';
+
     $sets = [];
     $params = [':id' => $id];
 
-    // Profil-Felder
+    // Profil-Felder (immer erlaubt)
     foreach (['vorname', 'nachname', 'email', 'telefon'] as $f) {
         if (isset($in[$f])) {
             $sets[] = "$f = :$f";
@@ -176,14 +181,14 @@ if ($action === 'update') {
         }
     }
 
-    // Aktiv-Status
-    if (isset($in['aktiv'])) {
+    // Aktiv-Status (nicht für Admins)
+    if (isset($in['aktiv']) && !$targetIsAdmin) {
         $sets[] = 'aktiv = :aktiv';
         $params[':aktiv'] = !empty($in['aktiv']) ? 1 : 0;
     }
 
-    // Rechte
-    if (isset($in['rechte']) && is_array($in['rechte'])) {
+    // Rechte (nicht für Admins - die haben immer alle Rechte)
+    if (isset($in['rechte']) && is_array($in['rechte']) && !$targetIsAdmin) {
         $rechteFields = [
             'revier', 'park', 'name_sichtbar', 'name_verbergen',
             'plan_revier', 'plan_park', 'lesen', 'admin'
@@ -195,7 +200,8 @@ if ($action === 'update') {
                 $params[":$col"] = !empty($in['rechte'][$r]) ? 1 : 0;
             }
         }
-        // Admin-Recht setzt auch rolle
+        // Admin-Recht setzt auch rolle (nur möglich wenn Ziel aktuell
+        // kein Admin ist - sonst wäre targetIsAdmin true und Block aktiv).
         if (isset($in['rechte']['admin'])) {
             $newRolle = !empty($in['rechte']['admin']) ? 'admin' : 'jaeger';
             $sets[] = 'rolle = :rolle';

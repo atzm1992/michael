@@ -4698,12 +4698,17 @@ function openUserEditPopup(userId) {
   // damit sich der Admin nicht versehentlich selbst die Rechte entzieht
   // oder deaktiviert.
   const isSelf = currentUserData && Number(u.id) === Number(currentUserData.id);
-  const dis = isSelf ? 'disabled' : '';
-  const selfHint = isSelf
-    ? '<p class="hint" style="color:var(--rot);">Eigene Rechte und Status können nicht geändert werden. Bitte einen anderen Admin damit beauftragen.</p>'
-    : '';
+  // Ziel-User ist Admin? Admins haben IMMER alle Rechte - nicht änderbar.
+  const targetIsAdmin = u.rolle === 'admin' || (u.rechte && u.rechte.admin);
+  const dis = (isSelf || targetIsAdmin) ? 'disabled' : '';
+  let hint = '';
+  if (isSelf) {
+    hint = '<p class="hint" style="color:var(--rot);">Eigene Rechte und Status können nicht geändert werden. Bitte einen anderen Admin damit beauftragen.</p>';
+  } else if (targetIsAdmin) {
+    hint = '<p class="hint" style="color:var(--gruen-d);">Dieser Benutzer ist Admin und hat automatisch alle Rechte. Die Rechte sind fest.</p>';
+  }
 
-  const statusSection = isSelf ? '' : `
+  const statusSection = (isSelf || targetIsAdmin) ? '' : `
     <div class="profile-section">
       <h4>Status</h4>
       <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
@@ -4724,8 +4729,8 @@ function openUserEditPopup(userId) {
     </div>
     <div class="profile-section">
       <h4>Berechtigungen</h4>
-      ${selfHint}
-      <div style="display:flex;flex-direction:column;gap:6px;${isSelf ? 'opacity:0.6;' : ''}">
+      ${hint}
+      <div style="display:flex;flex-direction:column;gap:6px;${(isSelf || targetIsAdmin) ? 'opacity:0.6;' : ''}">
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
           <input type="checkbox" id="ue_revier" ${rechte.revier?'checked':''} ${dis} style="width:auto;margin:0;"> Zugriff auf Revier
         </label>
@@ -4775,10 +4780,13 @@ function openUserEditPopup(userId) {
     } catch (err) { alert('Fehler: ' + err.message); }
   };
   box.querySelector('#ue_save_btn').onclick = async () => {
-    // Eigener Account: keine Rechte/Aktiv-Werte mitsenden. Backend
-    // blockiert das zusätzlich, aber hier sparen wir uns den Roundtrip.
+    // Eigener Account oder Admin-Ziel: keine Rechte/Aktiv mitsenden.
     if (isSelf) {
       toast('Eigene Rechte können nicht geändert werden', 'warn');
+      return;
+    }
+    if (targetIsAdmin) {
+      toast('Admins haben automatisch alle Rechte - nicht änderbar', 'warn');
       return;
     }
     const data = {
