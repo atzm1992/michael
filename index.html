@@ -1539,6 +1539,59 @@ function pwaInstallDismiss() {
   sessionStorage.setItem('pwaInstallDismissed', '1');
 }
 
+/* Manueller PWA-Install-Trigger (aus der Hilfe aufgerufen).
+   Bei Chrome/Android funktioniert prompt() direkt - wir merken uns
+   das Event auch, wenn der Banner nie gezeigt wurde.
+   Bei iOS Safari zeigt browser keinen beforeinstallprompt - wir
+   zeigen dem User stattdessen eine Anleitung. */
+function pwaInstallManual() {
+  // Bereits als App installiert?
+  const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+                    || window.navigator.standalone === true;
+  if (isStandalone) {
+    toast('Die App ist bereits installiert.', 'info');
+    return;
+  }
+  // Event vorhanden (Chrome/Edge/Android)?
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then(result => {
+      deferredInstallPrompt = null;
+      if (result.outcome === 'accepted') toast('App wird installiert...');
+    });
+    return;
+  }
+  // Kein nativer Prompt - Anleitung anzeigen
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+  const isFirefox = /Firefox/i.test(ua);
+  let msg;
+  if (isIOS) {
+    msg = 'iPhone/iPad: Tippe unten auf das <b>Teilen-Symbol</b> (Quadrat mit Pfeil nach oben) und wähle <b>„Zum Home-Bildschirm"</b>.';
+  } else if (isAndroid) {
+    msg = 'Android: Öffne das Browser-Menü (drei Punkte oben rechts) und wähle <b>„App installieren"</b> oder <b>„Zum Startbildschirm hinzufügen"</b>.';
+  } else if (isFirefox) {
+    msg = 'Firefox: Klick auf das Haus-Symbol in der Adressleiste und wähle <b>„Zum Startbildschirm hinzufügen"</b>.';
+  } else {
+    msg = 'Desktop: Klick auf das Installieren-Symbol (meist ein Monitor-Symbol) in der Adressleiste deines Browsers. Oder im Menü nach <b>„App installieren"</b> suchen.';
+  }
+  // Einfaches Overlay mit Anleitung
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2500;display:block;';
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:5%;right:5%;top:20vh;max-height:70vh;overflow-y:auto;background:#fff;padding:18px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.4);z-index:2501;';
+  ov.onclick = () => { ov.remove(); box.remove(); };
+  box.onclick = ev => ev.stopPropagation();
+  box.innerHTML = '<h3>📱 App installieren</h3>' +
+    '<p style="margin:10px 0;line-height:1.5;">' + msg + '</p>' +
+    '<p class="hint">Nach dem Installieren startest du die App direkt vom Homescreen oder Startmenü.</p>' +
+    '<div style="margin-top:14px;text-align:right;"><button id="pwaManualClose">Schließen</button></div>';
+  box.querySelector('#pwaManualClose').onclick = () => { ov.remove(); box.remove(); };
+  document.body.appendChild(ov);
+  document.body.appendChild(box);
+}
+
 /* ---------- Online/Offline-Indikator ---------- */
 let isOnline = navigator.onLine;
 window.addEventListener('online',  () => { isOnline = true;  flushOutbox(); updateOfflineBanner(); });
@@ -2472,26 +2525,32 @@ function openHelp() {
         "</ul>"
     },
     {
-      icon: "⚖️", title: "Deine Rechte",
+      adminOnly: true,
+      icon: "⚖️", title: "Rechte-Übersicht (Admin)",
       content:
-        "<ul>" +
-        "<li>" + (canRevier ? "✅" : "⛔") + " Zugriff auf Revier</li>" +
-        "<li>" + (canPark   ? "✅" : "⛔") + " Zugriff auf Park</li>" +
-        "<li>" + (r.plan_revier || isAdmin ? "✅" : "⛔") + " Plan bearbeiten Revier</li>" +
-        "<li>" + (r.plan_park   || isAdmin ? "✅" : "⛔") + " Plan bearbeiten Park</li>" +
-        "<li>" + (lesenAll  || isAdmin ? "✅" : "⛔") + " Leserechte (alle Namen sichtbar)</li>" +
-        "<li>" + (isAdmin ? "✅" : "⛔") + " Admin-Rechte</li>" +
-        "</ul>" +
-        "Fehlt dir ein Recht, bitte den Admin um Freischaltung."
+        "Als Admin hast du automatisch alle Rechte. Normale Benutzer " +
+        "bekommen ihre Rechte im Tab &bdquo;👥 Benutzer&ldquo; zugewiesen. " +
+        "Standard-Rechte für neu registrierte Jäger kannst du in den " +
+        "Allgemein-Einstellungen vorkonfigurieren."
+    },
+    {
+      icon: "📱", title: "App installieren (Homescreen)",
+      content:
+        "Installiere die Seite als App auf deinem Handy oder Desktop, " +
+        "damit sie im Vollbild läuft und schneller startet. Bei den " +
+        "meisten Browsern erscheint von allein ein Install-Banner – " +
+        "ansonsten kannst du die Installation unten manuell starten." +
+        '<div style="margin-top:10px;">' +
+        '  <button onclick="pwaInstallManual()">📲 Jetzt installieren</button>' +
+        '</div>'
     },
     {
       icon: "📴", title: "Offline-Modus",
       content:
-        "Die App ist eine PWA: du kannst sie über das Browser-Menü als " +
-        "App auf dem Homescreen installieren. Sie funktioniert auch ohne " +
-        "Internet. Einträge ohne Empfang werden in einer Warteschlange " +
-        "gesammelt und automatisch hochgeladen, sobald das Netz wieder " +
-        "da ist. Ein orangener Banner zeigt den Offline-Status an."
+        "Die App funktioniert auch ohne Internet. Einträge ohne Empfang " +
+        "werden in einer Warteschlange gesammelt und automatisch " +
+        "hochgeladen, sobald das Netz wieder da ist. Ein orangener " +
+        "Banner zeigt den Offline-Status an."
     },
     {
       show: () => canRevier || canPark,
