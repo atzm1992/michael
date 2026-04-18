@@ -3024,12 +3024,13 @@ async function renderPlan() {
     html += `<div class="plan-group">
       <h5>${esc(art)} <button class="sm sec" onclick="planAddRow(this,'${esc(art)}')">+ Klasse</button></h5>
       <table class="plan-edit">
-        <tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Extern</th><th>Zählt als</th><th></th></tr>`;
+        <thead><tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Extern</th><th>Zählt als</th><th></th></tr></thead>
+        <tbody>`;
     Object.keys(plan[art]).forEach(k => {
       const row = plan[art][k];
       html += planEditorRow(art, k, row);
     });
-    html += `</table></div>`;
+    html += `</tbody></table></div>`;
   });
 
   html += `<div style="margin-top:8px;">
@@ -3060,11 +3061,12 @@ function planEditorRow(art, klasse, row) {
 function planAddRow(btn, art) {
   const group = btn.closest('.plan-group');
   const table = group.querySelector('table');
+  const tbody = table.querySelector('tbody') || table;
   const tr = document.createElement('tr');
   tr.dataset.art = art;
   tr.innerHTML = planEditorRow(art, "", { plan: 0, enabled: true, matches: "" })
     .replace(/^<tr[^>]*>|<\/tr>$/g, '');
-  table.appendChild(tr);
+  tbody.appendChild(tr);
   tr.querySelector('.pe-k').focus();
 }
 
@@ -3077,7 +3079,8 @@ function planAddGroup() {
   div.innerHTML = `
     <h5>${esc(name)} <button class="sm sec" onclick="planAddRow(this,'${esc(name)}')">+ Klasse</button></h5>
     <table class="plan-edit">
-      <tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Zählt als (optional)</th><th></th></tr>
+      <thead><tr><th>✓</th><th>Klasse</th><th>Plan</th><th>Extern</th><th>Zählt als</th><th></th></tr></thead>
+      <tbody></tbody>
     </table>`;
   editor.appendChild(div);
 }
