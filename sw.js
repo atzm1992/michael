@@ -11,11 +11,15 @@
  *      Fehlerantwort, die der Client interpretieren kann.
  */
 
-const CACHE_NAME = 'jagdrevier-prad-v40';
+const CACHE_NAME = 'jagdrevier-prad-v41';
 const APP_SHELL = [
   './',
   './index.html',
   './logo.jpg',
+  './icon-192.png',
+  './icon-512.png',
+  './apple-touch-icon.png',
+  './manifest.webmanifest',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
