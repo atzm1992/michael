@@ -288,6 +288,7 @@ function hasRecht(string $key): bool {
 }
 
 function requireLogin(): void {
+    checkSessionTimeout();
     if (!currentUser()) {
         jsonErr('Nicht eingeloggt', 401);
     }
@@ -298,6 +299,63 @@ function requireAdmin(): void {
     if (!isAdmin()) {
         jsonErr('Nur für Admin', 403);
     }
+}
+
+/**
+ * Lädt die Default-Rechte für neu registrierte Benutzer aus der
+ * config-Tabelle. Fallback: nur Revier + Namen sichtbar.
+ */
+function getDefaultRechte(): array {
+    $defaults = [
+        'revier'         => true,
+        'park'           => false,
+        'name_sichtbar'  => true,
+        'name_verbergen' => false,
+        'plan_revier'    => false,
+        'plan_park'      => false,
+        'lesen'          => false,
+    ];
+    try {
+        $rows = db()->query("SELECT k, v FROM config WHERE k LIKE 'default_recht_%'")->fetchAll();
+        foreach ($rows as $row) {
+            $key = substr($row['k'], strlen('default_recht_'));
+            if (array_key_exists($key, $defaults)) {
+                $defaults[$key] = ($row['v'] === '1' || $row['v'] === 'true');
+            }
+        }
+    } catch (Throwable $e) { /* Tabelle fehlt? Defaults bleiben */ }
+    return $defaults;
+}
+
+/**
+ * Session-Idle-Timeout: Wenn seit der letzten Aktivität mehr als
+ * SESSION_IDLE_MAX Sekunden vergangen sind, wird die Session
+ * invalidiert. Default: 4 Stunden, konfigurierbar per config-key
+ * 'session_idle_max' (in Sekunden).
+ */
+function checkSessionTimeout(): void {
+    if (empty($_SESSION['uid'])) return;
+    $max = 4 * 3600; // 4h default
+    try {
+        $row = db()->prepare("SELECT v FROM config WHERE k = 'session_idle_max'");
+        $row->execute();
+        $v = (int) ($row->fetchColumn() ?: 0);
+        if ($v > 0) $max = $v;
+    } catch (Throwable $e) { /* ignore */ }
+
+    $now = time();
+    $last = (int) ($_SESSION['last_activity'] ?? $now);
+    if ($now - $last > $max) {
+        // Session abgelaufen
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $p = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+        }
+        jsonErr('Sitzung abgelaufen - bitte neu anmelden', 401);
+    }
+    $_SESSION['last_activity'] = $now;
 }
 
 function loadUserRechte(array $row): array {

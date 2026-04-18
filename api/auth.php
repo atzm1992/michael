@@ -107,6 +107,11 @@ if ($action === 'register') {
     if (!preg_match('/^[a-zA-Z0-9._-]+$/', $username)) {
         jsonErr('Benutzername darf nur Buchstaben, Zahlen, Punkt, Bindestrich und Unterstrich enthalten');
     }
+    // Reservierte Usernames schützen
+    $reserved = ['admin', 'administrator', 'root', 'system'];
+    if (in_array(strtolower($username), $reserved, true)) {
+        jsonErr('Dieser Benutzername ist reserviert');
+    }
     if ($password === '') jsonErr('Passwort erforderlich');
     if (strlen($password) < 6) jsonErr('Passwort muss mindestens 6 Zeichen lang sein');
     if ($vorname === '') jsonErr('Vorname erforderlich');
@@ -128,10 +133,18 @@ if ($action === 'register') {
     $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
     if (str_contains($ip, ',')) $ip = trim(explode(',', $ip)[0]);
     $ip = substr($ip, 0, 45);
+
+    // Default-Rechte aus Config-Tabelle laden (Admin kann diese einstellen)
+    $defaults = getDefaultRechte();
+
     $stmt = db()->prepare(
         'INSERT INTO users (username, pass_hash, vorname, nachname, email, telefon, rolle,
-         recht_revier, recht_name_sichtbar, aktiv, consent_at, consent_ip)
-         VALUES (:u, :h, :vn, :nn, :em, :tel, :rolle, 1, 1, 1, NOW(), :ip)'
+         recht_revier, recht_park, recht_name_sichtbar, recht_name_verbergen,
+         recht_plan_revier, recht_plan_park, recht_lesen,
+         aktiv, consent_at, consent_ip)
+         VALUES (:u, :h, :vn, :nn, :em, :tel, :rolle,
+         :r_rev, :r_park, :r_ns, :r_nv, :r_plr, :r_plp, :r_les,
+         1, NOW(), :ip)'
     );
     $stmt->execute([
         ':u'     => $username,
@@ -141,6 +154,13 @@ if ($action === 'register') {
         ':em'    => $email,
         ':tel'   => $telefon,
         ':rolle' => 'jaeger',
+        ':r_rev' => $defaults['revier'] ? 1 : 0,
+        ':r_park'=> $defaults['park'] ? 1 : 0,
+        ':r_ns'  => $defaults['name_sichtbar'] ? 1 : 0,
+        ':r_nv'  => $defaults['name_verbergen'] ? 1 : 0,
+        ':r_plr' => $defaults['plan_revier'] ? 1 : 0,
+        ':r_plp' => $defaults['plan_park'] ? 1 : 0,
+        ':r_les' => $defaults['lesen'] ? 1 : 0,
         ':ip'    => $ip,
     ]);
     $newId = (int) db()->lastInsertId();

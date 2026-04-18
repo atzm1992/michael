@@ -1180,6 +1180,47 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     </div>
 
     <div class="admin-section">
+      <h4>👥 Standard-Rechte für neue Registrierungen</h4>
+      <p class="hint" style="margin-bottom:8px;">
+        Welche Rechte bekommt ein Jäger automatisch, wenn er sich selbst registriert?
+        Du kannst die Rechte nachträglich im Tab „👥 Benutzer" anpassen.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:14px;">
+          <input id="cfgDefRevier" type="checkbox" style="width:auto;margin:0;"> Zugriff auf Revier
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:14px;">
+          <input id="cfgDefPark" type="checkbox" style="width:auto;margin:0;"> Zugriff auf Park
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:14px;">
+          <input id="cfgDefNameSichtbar" type="checkbox" style="width:auto;margin:0;"> Namen sichtbar
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:14px;">
+          <input id="cfgDefNameVerbergen" type="checkbox" style="width:auto;margin:0;"> Namen verbergen
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:14px;">
+          <input id="cfgDefPlanRevier" type="checkbox" style="width:auto;margin:0;"> Plan bearbeiten Revier
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:14px;">
+          <input id="cfgDefPlanPark" type="checkbox" style="width:auto;margin:0;"> Plan bearbeiten Park
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:14px;">
+          <input id="cfgDefLesen" type="checkbox" style="width:auto;margin:0;"> Leserechte (alle Namen sichtbar)
+        </label>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <h4>⏱️ Sitzungs-Timeout</h4>
+      <div class="admin-row">
+        <label>Nach X Minuten Inaktivität abmelden:</label>
+        <input id="cfgSessionIdle" type="number" min="5" max="10080" placeholder="240" style="max-width:100px;">
+        <span style="font-size:13px;color:var(--grau);">Minuten</span>
+      </div>
+      <p class="hint">Standard: 240 (4 Stunden). Min. 5, max. 10080 (1 Woche).</p>
+    </div>
+
+    <div class="admin-section">
       <h4>🔑 Passwort ändern</h4>
       <div class="admin-row">
         <label>Neues Passwort:</label>
@@ -1637,6 +1678,12 @@ const api = {
     let data = {};
     try { data = await res.json(); } catch (_) { /* empty body */ }
     if (!res.ok || data.ok === false) {
+      // Sitzung abgelaufen → zurück zur Login-Seite
+      if (res.status === 401 && currentUserData && currentUserData.logged_in) {
+        isAdmin = false; currentUser = null; currentUserData = null; userRechte = {};
+        try { zeigeSeite('auth-page'); } catch (_) {}
+        try { toast('Sitzung abgelaufen - bitte neu anmelden', 'warn'); } catch (_) {}
+      }
       throw new Error(data.error || ('HTTP ' + res.status));
     }
     return data.data;
@@ -2019,6 +2066,40 @@ function applyConfig() {
   if (cfgCC) cfgCC.checked = (config.cardsCompact !== false);
   const cfgPV = document.getElementById("cfgParkVisible");
   if (cfgPV) cfgPV.checked = (config.parkVisible !== false);
+
+  // Default-Rechte für Selbst-Registrierung (in DB gespeichert)
+  const defMap = {
+    cfgDefRevier:         'default_recht_revier',
+    cfgDefPark:           'default_recht_park',
+    cfgDefNameSichtbar:   'default_recht_name_sichtbar',
+    cfgDefNameVerbergen:  'default_recht_name_verbergen',
+    cfgDefPlanRevier:     'default_recht_plan_revier',
+    cfgDefPlanPark:       'default_recht_plan_park',
+    cfgDefLesen:          'default_recht_lesen',
+  };
+  const defDefaults = {
+    default_recht_revier: true,
+    default_recht_park: false,
+    default_recht_name_sichtbar: true,
+    default_recht_name_verbergen: false,
+    default_recht_plan_revier: false,
+    default_recht_plan_park: false,
+    default_recht_lesen: false,
+  };
+  Object.entries(defMap).forEach(([domId, cfgKey]) => {
+    const el = document.getElementById(domId);
+    if (!el) return;
+    const v = config[cfgKey];
+    el.checked = (v === '1' || v === 1 || v === true)
+      || (v === undefined && defDefaults[cfgKey]);
+  });
+
+  // Session-Timeout in Minuten anzeigen (in DB in Sekunden gespeichert)
+  const cfgIdle = document.getElementById("cfgSessionIdle");
+  if (cfgIdle) {
+    const sec = parseInt(config.session_idle_max || 0, 10);
+    cfgIdle.value = sec > 0 ? Math.round(sec / 60) : 240;
+  }
 
   const fab = document.getElementById("adminFab");
   if (fab) {
@@ -4293,6 +4374,11 @@ async function doRegister() {
     errEl.textContent = 'Benutzername muss mind. 3 Zeichen haben.';
     errEl.style.display = 'block'; return;
   }
+  const reservedNames = ['admin', 'administrator', 'root', 'system'];
+  if (reservedNames.includes(username.toLowerCase())) {
+    errEl.textContent = 'Dieser Benutzername ist reserviert.';
+    errEl.style.display = 'block'; return;
+  }
   if (password.length < 6) {
     errEl.textContent = 'Passwort muss mind. 6 Zeichen haben.';
     errEl.style.display = 'block'; return;
@@ -4729,19 +4815,57 @@ async function saveConfig() {
   config.planVisible  = document.getElementById("cfgPlanVisible").checked;
   config.cardsCompact = document.getElementById("cfgCardsCompact").checked;
   config.parkVisible  = document.getElementById("cfgParkVisible").checked;
+
+  // Default-Rechte für Selbst-Registrierung
+  const defMap = {
+    cfgDefRevier:        'default_recht_revier',
+    cfgDefPark:          'default_recht_park',
+    cfgDefNameSichtbar:  'default_recht_name_sichtbar',
+    cfgDefNameVerbergen: 'default_recht_name_verbergen',
+    cfgDefPlanRevier:    'default_recht_plan_revier',
+    cfgDefPlanPark:      'default_recht_plan_park',
+    cfgDefLesen:         'default_recht_lesen',
+  };
+  const defaultRechteValues = {};
+  Object.entries(defMap).forEach(([domId, cfgKey]) => {
+    const el = document.getElementById(domId);
+    if (el) {
+      config[cfgKey] = el.checked ? "1" : "0";
+      defaultRechteValues[cfgKey] = el.checked ? "1" : "0";
+    }
+  });
+
+  // Session-Timeout (Minuten → Sekunden)
+  const idleInput = document.getElementById("cfgSessionIdle");
+  let idleSec = null;
+  if (idleInput) {
+    const min = parseInt(idleInput.value, 10);
+    if (isNaN(min) || min < 5) {
+      toast("Timeout muss mind. 5 Minuten sein", "warn"); return;
+    }
+    if (min > 10080) {
+      toast("Timeout max. 10080 Minuten (1 Woche)", "warn"); return;
+    }
+    idleSec = min * 60;
+    config.session_idle_max = String(idleSec);
+  }
+
   saveCfg();         // lokaler Cache
   applyConfig();
-  anzeigen();        // Tabelle neu rendern, damit die Card-Darstellung wechselt
-  // Server-seitig speichern, damit die Werte für ALLE Geräte gelten
+  anzeigen();        // Tabelle neu rendern
+  // Server-seitig speichern
   try {
-    await api.saveConfig({
+    const payload = {
       revier:       config.revier,
       code:         config.code,
       abfallText:   config.abfallText,
       planVisible:  config.planVisible  ? "1" : "0",
       cardsCompact: config.cardsCompact ? "1" : "0",
       parkVisible:  config.parkVisible  ? "1" : "0",
-    });
+      ...defaultRechteValues,
+    };
+    if (idleSec !== null) payload.session_idle_max = String(idleSec);
+    await api.saveConfig(payload);
     toast("✓ Einstellungen gespeichert");
   } catch (err) {
     toast("⚠ Lokal gespeichert, Server-Speichern fehlgeschlagen: " + err.message, "warn");
