@@ -39,6 +39,7 @@ body {
   justify-content: center;
   padding: 10px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .container {
@@ -790,10 +791,18 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 .perm-badge.perm-inactive { background: #bdbdbd; color: #666; }
 
 /* ==================== USER MANAGEMENT TABLE ==================== */
+.user-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .user-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.user-table th { background: var(--gruen); color: #fff; padding: 8px 6px; text-align: left; font-size: 12px; }
-.user-table td { padding: 6px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
+.user-table th { background: var(--gruen); color: #fff; padding: 8px 6px; text-align: left; font-size: 12px; white-space: nowrap; }
+.user-table td { padding: 6px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; word-break: break-word; }
+.user-table td.user-email { font-size: 11px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-table tr:hover { background: var(--gruen-l); cursor: pointer; }
+@media (max-width: 700px) {
+  .user-table th.col-email, .user-table td.col-email,
+  .user-table th.col-rechte, .user-table td.col-rechte { display: none; }
+  .user-table { font-size: 12px; }
+  .user-table th, .user-table td { padding: 6px 4px; }
+}
 
 /* ==================== IMPRESSUM PAGE ==================== */
 .impressum-page { padding: 10px; }
@@ -4542,7 +4551,9 @@ async function loadUsersTab() {
       container.innerHTML = '<p class="hint">Keine Benutzer gefunden.</p>';
       return;
     }
-    let html = '<table class="user-table"><tr><th>Name</th><th>Username</th><th>E-Mail</th><th>Rechte</th><th>Aktiv</th></tr>';
+    let html = '<div class="user-table-wrap"><table class="user-table">'
+             + '<tr><th>Name</th><th>Username</th><th class="col-email">E-Mail</th>'
+             + '<th class="col-rechte">Rechte</th><th>Aktiv</th></tr>';
     users.forEach(u => {
       const name = esc(((u.vorname||'') + ' ' + (u.nachname||'')).trim() || '–');
       const rechte = u.rechte || {};
@@ -4560,11 +4571,11 @@ async function loadUsersTab() {
       html += '<tr onclick="openUserEditPopup(' + u.id + ')" style="cursor:pointer;">'
         + '<td>' + name + '</td>'
         + '<td>' + esc(u.username||'') + '</td>'
-        + '<td style="font-size:11px;">' + esc(u.email||'') + '</td>'
-        + '<td>' + (badges || '–') + '</td>'
+        + '<td class="user-email col-email">' + esc(u.email||'') + '</td>'
+        + '<td class="col-rechte">' + (badges || '–') + '</td>'
         + '<td>' + aktiv + '</td></tr>';
     });
-    html += '</table>';
+    html += '</table></div>';
     container.innerHTML = html;
     // Store for popup usage
     container._usersData = users;
