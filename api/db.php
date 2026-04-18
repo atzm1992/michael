@@ -225,6 +225,25 @@ function ensureSchema(): void {
     try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN user_id INT NULL AFTER name"); }
     catch (PDOException $e) { /* exists */ }
 
+    // Self-Heal: Der User mit username='admin' muss IMMER Admin sein.
+    // (Falls die Rolle versehentlich durch eine frühere Aktion verloren
+    // ging, wird sie hier wiederhergestellt.)
+    try {
+        $pdo->exec("UPDATE users SET rolle = 'admin', aktiv = 1
+          WHERE username = 'admin'");
+    } catch (PDOException $e) { /* ignore */ }
+
+    // Self-Heal: Wenn es aktuell keinen aktiven Admin gibt, wird der
+    // älteste User zum Admin befördert - damit die App nie "verwaist"
+    // ist und niemand mehr administrieren kann.
+    try {
+        $hasAdmin = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE rolle = 'admin' AND aktiv = 1")->fetchColumn();
+        if ($hasAdmin === 0) {
+            $pdo->exec("UPDATE users SET rolle = 'admin', aktiv = 1
+              WHERE id = (SELECT id FROM (SELECT id FROM users ORDER BY id ASC LIMIT 1) AS x)");
+        }
+    } catch (PDOException $e) { /* ignore */ }
+
     // Migration: alle Admin-Accounts (rolle='admin') bekommen IMMER alle
     // Rechte gesetzt. Doppelte Absicherung zur Laufzeit-Logik in
     // loadUserRechte().
