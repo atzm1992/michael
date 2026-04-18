@@ -77,6 +77,15 @@ if ($action === 'create') {
     $rechte   = is_array($in['rechte'] ?? null) ? $in['rechte'] : [];
 
     if ($username === '' || strlen($username) < 3) jsonErr('Benutzername (min. 3 Zeichen) erforderlich');
+    if (!preg_match('/^[a-zA-Z0-9._-]+$/', $username)) jsonErr('Ungültiger Benutzername');
+    $reserved = ['admin', 'administrator', 'root', 'system'];
+    if (in_array(strtolower($username), $reserved, true)) {
+        // Ausnahme: Wenn noch kein Admin-Account existiert, darf "admin" angelegt werden
+        $hasAdmin = (int) db()->query("SELECT COUNT(*) FROM users WHERE username = 'admin'")->fetchColumn();
+        if ($hasAdmin > 0 || strtolower($username) !== 'admin') {
+            jsonErr('Dieser Benutzername ist reserviert');
+        }
+    }
     if (strlen($password) < 6) jsonErr('Passwort mind. 6 Zeichen');
     if ($vorname === '' || $nachname === '') jsonErr('Vor- und Nachname erforderlich');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonErr('Ungültige E-Mail-Adresse');
