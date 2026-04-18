@@ -815,8 +815,8 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 
 <div class="container">
 
-<!-- STARTSEITE -->
-<div id="start" class="page active">
+<!-- STARTSEITE (initial versteckt bis Login) -->
+<div id="start" class="page">
   <div class="header">
     <img src="logo.jpg"
          alt="Jagdrevier Prad" onerror="this.style.display='none'" id="logoImg">
@@ -995,7 +995,7 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 </div>
 
 <!-- LOGIN / REGISTRATION PAGE -->
-<div id="auth-page" class="page">
+<div id="auth-page" class="page active">
   <div class="login-page">
     <div class="header">
       <img src="logo.jpg" alt="Jagdrevier Prad" onerror="this.style.display='none'">
@@ -1851,6 +1851,9 @@ function applyUserData(a) {
 
 /* Run after successful login or on init when already logged in */
 async function initAfterLogin() {
+  // Nach Login zur Startseite wechseln (falls noch auf auth-page)
+  zeigeSeite('start');
+
   // Server-Config laden (überschreibt den lokalen Cache). Die Werte
   // gelten für alle Geräte, werden aber lokal gecached, damit die
   // Seite offline startet.
