@@ -25,15 +25,22 @@ if ($method === 'GET') {
     $eintraege = $pdo->query('SELECT * FROM eintraege ORDER BY id')->fetchAll();
     $plan      = $pdo->query('SELECT * FROM abschussplan')->fetchAll();
     $config    = $pdo->query('SELECT * FROM config')->fetchAll();
-    // users NICHT dumpen – Passwort-Hashes sollen nicht exportiert werden
+    // Benutzer exportieren (ohne Passwort-Hashes)
+    $usersRaw  = $pdo->query('SELECT * FROM users ORDER BY id')->fetchAll();
+    $users = [];
+    foreach ($usersRaw as $u) {
+        unset($u['pass_hash']);
+        $users[] = $u;
+    }
 
     $dump = [
         'app'       => 'jagdrevier-prad',
-        'version'   => 1,
+        'version'   => 2,
         'exported'  => date('c'),
         'eintraege' => $eintraege,
         'abschussplan' => $plan,
         'config'    => $config,
+        'users'     => $users,
     ];
 
     // Rohes JSON ohne die ok/data-Hülle, damit es als Datei brauchbar ist
@@ -62,7 +69,7 @@ if ($method === 'POST') {
         }
 
         // Einträge wieder einspielen
-        $cols = ['id','name','wildart','wild','gewicht','ort',
+        $cols = ['id','name','user_id','wildart','wild','gewicht','ort',
                  'koord_x','koord_y','koord_lat','koord_lng','wetter',
                  'zeit','datum','verwendung','entnommen','abfall','gemeldet','ist_park','ist_fallwild'];
         $sql  = 'INSERT INTO eintraege (' . implode(',', $cols) . ') VALUES (:'

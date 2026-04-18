@@ -2,10 +2,11 @@
 /**
  * Auth-Endpoint
  *
- * POST /api/auth.php            JSON { action: "login", username, password }
- * POST /api/auth.php            JSON { action: "logout" }
- * GET  /api/auth.php            → aktuelle Session-Info ({ logged_in, username, rolle })
- * POST /api/auth.php            JSON { action: "change_pw", old, new }  (eingeloggt)
+ * GET  /api/auth.php                               → aktuelle Session-Info
+ * POST /api/auth.php  { action: "login", ... }     → Login
+ * POST /api/auth.php  { action: "logout" }          → Logout
+ * POST /api/auth.php  { action: "register", ... }   → Registrierung
+ * POST /api/auth.php  { action: "change_pw", ... }  → Passwort ändern (eingeloggt)
  */
 
 require_once __DIR__ . '/db.php';
@@ -16,11 +17,22 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 /* GET: Status abfragen */
 if ($method === 'GET') {
     $u = currentUser();
-    jsonOk([
-        'logged_in' => $u !== null,
-        'username'  => $u['username'] ?? null,
-        'rolle'     => $u['rolle']    ?? null,
-    ]);
+    if (!$u) {
+        jsonOk(['logged_in' => false]);
+    }
+    // Frische Daten aus DB laden (Rechte könnten sich geändert haben)
+    $stmt = db()->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $u['id']]);
+    $fresh = $stmt->fetch();
+    if (!$fresh || !(int)($fresh['aktiv'] ?? 1)) {
+        // User gelöscht oder deaktiviert
+        $_SESSION = [];
+        jsonOk(['logged_in' => false]);
+    }
+    setSessionFromRow($fresh);
+    $data = userResponseData($fresh);
+    $data['logged_in'] = true;
+    jsonOk($data);
 }
 
 if ($method !== 'POST') {
@@ -30,17 +42,17 @@ if ($method !== 'POST') {
 $in = jsonInput();
 $action = $in['action'] ?? '';
 
+/* ================= LOGIN ================= */
 if ($action === 'login') {
     $username = trim((string) ($in['username'] ?? ''));
     $password = (string) ($in['password'] ?? '');
     if ($username === '' || $password === '') {
         jsonErr('Benutzer und Passwort erforderlich');
     }
-    // Leichtes Rate-Limiting gegen Brute Force
     if (($_SESSION['login_fail'] ?? 0) >= 10) {
         jsonErr('Zu viele Fehlversuche – bitte später erneut versuchen.', 429);
     }
-    $stmt = db()->prepare('SELECT id, username, pass_hash, rolle FROM users WHERE username = :u LIMIT 1');
+    $stmt = db()->prepare('SELECT * FROM users WHERE username = :u LIMIT 1');
     $stmt->execute([':u' => $username]);
     $row = $stmt->fetch();
 
@@ -49,26 +61,26 @@ if ($action === 'login') {
         jsonErr('Falsche Zugangsdaten', 401);
     }
 
-    // Login erfolgreich: Session regenerieren, Daten setzen
+    if (!(int)($row['aktiv'] ?? 1)) {
+        jsonErr('Konto ist deaktiviert. Bitte den Admin kontaktieren.', 403);
+    }
+
     session_regenerate_id(true);
-    $_SESSION['uid']        = (int) $row['id'];
-    $_SESSION['username']   = $row['username'];
-    $_SESSION['rolle']      = $row['rolle'];
+    setSessionFromRow($row);
     $_SESSION['login_fail'] = 0;
 
-    // Optional: Hash-Rehash bei schwächerem Algorithmus
     if (password_needs_rehash($row['pass_hash'], PASSWORD_DEFAULT)) {
         $new = password_hash($password, PASSWORD_DEFAULT);
         db()->prepare('UPDATE users SET pass_hash = :h WHERE id = :id')
             ->execute([':h' => $new, ':id' => $row['id']]);
     }
 
-    jsonOk([
-        'username' => $row['username'],
-        'rolle'    => $row['rolle'],
-    ]);
+    $data = userResponseData($row);
+    $data['logged_in'] = true;
+    jsonOk($data);
 }
 
+/* ================= LOGOUT ================= */
 if ($action === 'logout') {
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
@@ -80,12 +92,72 @@ if ($action === 'logout') {
     jsonOk();
 }
 
+/* ================= REGISTER ================= */
+if ($action === 'register') {
+    $username = trim((string) ($in['username'] ?? ''));
+    $password = (string) ($in['password'] ?? '');
+    $vorname  = trim((string) ($in['vorname'] ?? ''));
+    $nachname = trim((string) ($in['nachname'] ?? ''));
+    $email    = trim((string) ($in['email'] ?? ''));
+    $telefon  = trim((string) ($in['telefon'] ?? ''));
+
+    if ($username === '') jsonErr('Benutzername erforderlich');
+    if (strlen($username) < 3) jsonErr('Benutzername muss mindestens 3 Zeichen lang sein');
+    if (!preg_match('/^[a-zA-Z0-9._-]+$/', $username)) {
+        jsonErr('Benutzername darf nur Buchstaben, Zahlen, Punkt, Bindestrich und Unterstrich enthalten');
+    }
+    if ($password === '') jsonErr('Passwort erforderlich');
+    if (strlen($password) < 6) jsonErr('Passwort muss mindestens 6 Zeichen lang sein');
+    if ($vorname === '') jsonErr('Vorname erforderlich');
+    if ($nachname === '') jsonErr('Nachname erforderlich');
+    if ($email === '') jsonErr('E-Mail erforderlich');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonErr('Ungültige E-Mail-Adresse');
+
+    // Prüfen ob Username schon vergeben
+    $check = db()->prepare('SELECT id FROM users WHERE username = :u LIMIT 1');
+    $check->execute([':u' => $username]);
+    if ($check->fetch()) {
+        jsonErr('Benutzername ist bereits vergeben');
+    }
+
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    $stmt = db()->prepare(
+        'INSERT INTO users (username, pass_hash, vorname, nachname, email, telefon, rolle,
+         recht_revier, recht_name_sichtbar, aktiv)
+         VALUES (:u, :h, :vn, :nn, :em, :tel, :rolle, 1, 1, 1)'
+    );
+    $stmt->execute([
+        ':u'     => $username,
+        ':h'     => $hash,
+        ':vn'    => $vorname,
+        ':nn'    => $nachname,
+        ':em'    => $email,
+        ':tel'   => $telefon,
+        ':rolle' => 'jaeger',
+    ]);
+    $newId = (int) db()->lastInsertId();
+
+    // Direkt einloggen
+    $row = db()->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
+    $row->execute([':id' => $newId]);
+    $newUser = $row->fetch();
+
+    session_regenerate_id(true);
+    setSessionFromRow($newUser);
+    $_SESSION['login_fail'] = 0;
+
+    $data = userResponseData($newUser);
+    $data['logged_in'] = true;
+    jsonOk($data);
+}
+
+/* ================= CHANGE PASSWORD ================= */
 if ($action === 'change_pw') {
     requireLogin();
     $old = (string) ($in['old'] ?? '');
     $new = (string) ($in['new'] ?? '');
-    if (strlen($new) < 4) {
-        jsonErr('Neues Passwort muss mindestens 4 Zeichen lang sein');
+    if (strlen($new) < 6) {
+        jsonErr('Neues Passwort muss mindestens 6 Zeichen lang sein');
     }
     $stmt = db()->prepare('SELECT pass_hash FROM users WHERE id = :id');
     $stmt->execute([':id' => $_SESSION['uid']]);

@@ -179,10 +179,47 @@ function ensureSchema(): void {
           id          INT AUTO_INCREMENT PRIMARY KEY,
           username    VARCHAR(50) UNIQUE NOT NULL,
           pass_hash   VARCHAR(255) NOT NULL,
+          vorname     VARCHAR(100) NOT NULL DEFAULT '',
+          nachname    VARCHAR(100) NOT NULL DEFAULT '',
+          email       VARCHAR(255) NOT NULL DEFAULT '',
+          telefon     VARCHAR(50) NOT NULL DEFAULT '',
           rolle       ENUM('admin','jaeger') NOT NULL DEFAULT 'jaeger',
+          recht_revier        TINYINT(1) NOT NULL DEFAULT 0,
+          recht_park          TINYINT(1) NOT NULL DEFAULT 0,
+          recht_name_sichtbar TINYINT(1) NOT NULL DEFAULT 0,
+          recht_name_verbergen TINYINT(1) NOT NULL DEFAULT 0,
+          recht_plan_revier   TINYINT(1) NOT NULL DEFAULT 0,
+          recht_plan_park     TINYINT(1) NOT NULL DEFAULT 0,
+          recht_lesen         TINYINT(1) NOT NULL DEFAULT 0,
+          recht_admin         TINYINT(1) NOT NULL DEFAULT 0,
+          aktiv       TINYINT(1) NOT NULL DEFAULT 1,
           created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    // Migration: neue Spalten zu bestehender users-Tabelle hinzufügen
+    $userCols = [
+        "ALTER TABLE users ADD COLUMN vorname VARCHAR(100) NOT NULL DEFAULT '' AFTER pass_hash",
+        "ALTER TABLE users ADD COLUMN nachname VARCHAR(100) NOT NULL DEFAULT '' AFTER vorname",
+        "ALTER TABLE users ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT '' AFTER nachname",
+        "ALTER TABLE users ADD COLUMN telefon VARCHAR(50) NOT NULL DEFAULT '' AFTER email",
+        "ALTER TABLE users ADD COLUMN recht_revier TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN recht_park TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN recht_name_sichtbar TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN recht_name_verbergen TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN recht_plan_revier TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN recht_plan_park TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN recht_lesen TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN recht_admin TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN aktiv TINYINT(1) NOT NULL DEFAULT 1",
+    ];
+    foreach ($userCols as $sql) {
+        try { $pdo->exec($sql); } catch (PDOException $e) { /* exists */ }
+    }
+
+    // Migration: user_id in eintraege (verknüpft Eintrag mit Ersteller)
+    try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN user_id INT NULL AFTER name"); }
+    catch (PDOException $e) { /* exists */ }
 
     // Default-Admin anlegen, falls users leer
     $count = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
@@ -190,7 +227,8 @@ function ensureSchema(): void {
         $hash = $CONFIG['app_pass_hash'] ?? '';
         if ($hash !== '') {
             $stmt = $pdo->prepare(
-                "INSERT INTO users (username, pass_hash, rolle) VALUES ('admin', :h, 'admin')"
+                "INSERT INTO users (username, pass_hash, vorname, nachname, rolle, recht_admin, recht_revier, recht_park, recht_lesen, recht_name_sichtbar, aktiv)
+                 VALUES ('admin', :h, 'Admin', '', 'admin', 1, 1, 1, 1, 1, 1)"
             );
             $stmt->execute([':h' => $hash]);
         }
@@ -228,12 +266,21 @@ function currentUser(): ?array {
     return [
         'id'       => $_SESSION['uid'],
         'username' => $_SESSION['username'] ?? '',
+        'vorname'  => $_SESSION['vorname']  ?? '',
+        'nachname' => $_SESSION['nachname'] ?? '',
         'rolle'    => $_SESSION['rolle']    ?? 'jaeger',
+        'rechte'   => $_SESSION['rechte']   ?? [],
     ];
 }
 
 function isAdmin(): bool {
-    return ($_SESSION['rolle'] ?? '') === 'admin';
+    return ($_SESSION['rolle'] ?? '') === 'admin'
+        || !empty($_SESSION['rechte']['admin']);
+}
+
+function hasRecht(string $key): bool {
+    if (isAdmin()) return true;
+    return !empty($_SESSION['rechte'][$key]);
 }
 
 function requireLogin(): void {
@@ -244,7 +291,40 @@ function requireLogin(): void {
 
 function requireAdmin(): void {
     requireLogin();
-    if (($_SESSION['rolle'] ?? '') !== 'admin') {
+    if (!isAdmin()) {
         jsonErr('Nur für Admin', 403);
     }
+}
+
+function loadUserRechte(array $row): array {
+    return [
+        'revier'          => (int) ($row['recht_revier'] ?? 0) === 1,
+        'park'            => (int) ($row['recht_park'] ?? 0) === 1,
+        'name_sichtbar'   => (int) ($row['recht_name_sichtbar'] ?? 0) === 1,
+        'name_verbergen'  => (int) ($row['recht_name_verbergen'] ?? 0) === 1,
+        'plan_revier'     => (int) ($row['recht_plan_revier'] ?? 0) === 1,
+        'plan_park'       => (int) ($row['recht_plan_park'] ?? 0) === 1,
+        'lesen'           => (int) ($row['recht_lesen'] ?? 0) === 1,
+        'admin'           => (int) ($row['recht_admin'] ?? 0) === 1,
+    ];
+}
+
+function setSessionFromRow(array $row): void {
+    $_SESSION['uid']      = (int) $row['id'];
+    $_SESSION['username'] = $row['username'];
+    $_SESSION['vorname']  = $row['vorname'] ?? '';
+    $_SESSION['nachname'] = $row['nachname'] ?? '';
+    $_SESSION['rolle']    = $row['rolle'];
+    $_SESSION['rechte']   = loadUserRechte($row);
+}
+
+function userResponseData(array $row): array {
+    return [
+        'id'       => (int) $row['id'],
+        'username' => $row['username'],
+        'vorname'  => $row['vorname'] ?? '',
+        'nachname' => $row['nachname'] ?? '',
+        'rolle'    => $row['rolle'],
+        'rechte'   => loadUserRechte($row),
+    ];
 }
