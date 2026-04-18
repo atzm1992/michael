@@ -895,6 +895,9 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   <h3>👤 Name Erleger</h3>
   <input id="inputName" autocomplete="off" placeholder="Name eingeben...">
   <div id="nameSuggestions" style="margin:4px 0;"></div>
+  <p class="hint" id="nameInputHint" style="display:none;">
+    Als Admin: Wähle einen Benutzer aus der Liste oder tippe einen beliebigen Namen frei ein.
+  </p>
   <button onclick="nextWild()">Weiter ➡</button>
   <button class="sec" onclick="workflowAbort()">✕ Abbrechen</button>
 </div>
@@ -1263,8 +1266,11 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   <!-- TAB: BENUTZER -->
   <div id="tab-users" class="admin-tab-content">
     <div class="admin-section">
-      <h4>👥 Registrierte Benutzer</h4>
-      <div id="usersListContainer"><p class="hint">Wird geladen...</p></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <h4 style="margin:0;">👥 Registrierte Benutzer</h4>
+        <button class="sm" onclick="openUserCreatePopup()">➕ Neuer Benutzer</button>
+      </div>
+      <div id="usersListContainer" style="margin-top:8px;"><p class="hint">Wird geladen...</p></div>
     </div>
   </div>
 
@@ -1689,6 +1695,12 @@ const api = {
     });
   },
   listUsers() { return this.req('api/users.php'); },
+  createUser(data) {
+    return this.req('api/users.php', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'create', ...data }),
+    });
+  },
   updateUser(id, data) {
     return this.req('api/users.php', {
       method: 'POST',
@@ -2986,6 +2998,8 @@ function neuerEintrag() {
 /* Admin name select: dropdown of registered users + custom input */
 async function buildAdminNameSelect() {
   const container = document.getElementById("nameSuggestions");
+  const hintEl = document.getElementById("nameInputHint");
+  if (hintEl) hintEl.style.display = 'block';
   container.innerHTML = '<p class="hint">Lade Benutzerliste...</p>';
   try {
     const names = await api.listNames();
@@ -2993,29 +3007,26 @@ async function buildAdminNameSelect() {
     if (Array.isArray(names) && names.length) {
       const sel = document.createElement('select');
       sel.id = 'adminNameSelect';
-      sel.style.marginBottom = '6px';
+      sel.style.cssText = 'margin-bottom:6px;width:100%;';
       const phOpt = document.createElement('option');
-      phOpt.value = ''; phOpt.textContent = '-- Benutzer wählen --';
+      phOpt.value = ''; phOpt.textContent = '-- Benutzer aus Liste wählen --';
       sel.appendChild(phOpt);
       names.forEach(n => {
+        const fullName = ((n.vorname || '') + ' ' + (n.nachname || '')).trim()
+                         || n.name || n.username || '';
+        if (!fullName) return;
         const o = document.createElement('option');
-        const fullName = ((n.vorname || '') + ' ' + (n.nachname || '')).trim();
         o.value = fullName;
         o.textContent = fullName + (n.username ? ' (' + n.username + ')' : '');
         sel.appendChild(o);
       });
       sel.onchange = () => {
-        document.getElementById('inputName').value = sel.value;
+        if (sel.value) document.getElementById('inputName').value = sel.value;
       };
       container.appendChild(sel);
     }
-    const hint = document.createElement('p');
-    hint.className = 'hint';
-    hint.textContent = 'Oder Namen manuell eingeben.';
-    container.appendChild(hint);
-  } catch (_) {
-    container.innerHTML = '';
-    buildNameSugg();
+  } catch (err) {
+    container.innerHTML = '<p class="hint" style="color:var(--rot);">Liste konnte nicht geladen werden. Namen bitte frei eintippen.</p>';
   }
 }
 
@@ -4474,6 +4485,100 @@ async function loadUsersTab() {
   } catch (err) {
     container.innerHTML = '<p class="hint" style="color:var(--rot);">Fehler: ' + esc(err.message) + '</p>';
   }
+}
+
+function openUserCreatePopup() {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;display:block;';
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:4%;right:4%;top:3vh;max-height:94vh;overflow-y:auto;background:#fff;padding:16px 18px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.4);z-index:1000;display:block;-webkit-overflow-scrolling:touch;';
+  ov.onclick = () => { ov.remove(); box.remove(); };
+  box.onclick = ev => ev.stopPropagation();
+  box.innerHTML = `
+    <h3>Neuen Benutzer anlegen</h3>
+    <div class="profile-section">
+      <h4>Profil</h4>
+      <div class="edit-row"><label>Vorname *</label><input id="nu_vorname" placeholder="Vorname"></div>
+      <div class="edit-row"><label>Nachname *</label><input id="nu_nachname" placeholder="Nachname"></div>
+      <div class="edit-row"><label>E-Mail *</label><input id="nu_email" type="email" placeholder="E-Mail"></div>
+      <div class="edit-row"><label>Telefon *</label><input id="nu_telefon" type="tel" placeholder="Telefon"></div>
+      <div class="edit-row"><label>Benutzername *</label><input id="nu_username" placeholder="Benutzername"></div>
+      <div class="edit-row"><label>Passwort *</label><input id="nu_password" type="password" placeholder="mind. 6 Zeichen"></div>
+    </div>
+    <div class="profile-section">
+      <h4>Berechtigungen</h4>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="nu_revier" checked style="width:auto;margin:0;"> Zugriff auf Revier
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="nu_park" style="width:auto;margin:0;"> Zugriff auf Park
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="nu_name_sichtbar" checked style="width:auto;margin:0;"
+           onchange="if(this.checked) document.getElementById('nu_name_verbergen').checked=false;"> Namen sichtbar
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="nu_name_verbergen" style="width:auto;margin:0;"
+           onchange="if(this.checked) document.getElementById('nu_name_sichtbar').checked=false;"> Namen verbergen
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="nu_plan_revier" style="width:auto;margin:0;"> Plan bearbeiten Revier
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="nu_plan_park" style="width:auto;margin:0;"> Plan bearbeiten Park
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="nu_lesen" style="width:auto;margin:0;"> Leserechte (sieht alle Namen)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="nu_admin" style="width:auto;margin:0;"> Admin-Rechte
+        </label>
+      </div>
+    </div>
+    <div id="nu_err" class="login-error" style="margin-bottom:8px;"></div>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button id="nu_save_btn" style="flex:1;">➕ Anlegen</button>
+      <button class="sec" id="nu_close_btn" style="flex:1;">Abbrechen</button>
+    </div>`;
+  function showNuErr(msg) {
+    const e = document.getElementById('nu_err');
+    e.textContent = msg; e.style.display = 'block';
+  }
+  box.querySelector('#nu_save_btn').onclick = async () => {
+    const data = {
+      vorname: document.getElementById('nu_vorname').value.trim(),
+      nachname: document.getElementById('nu_nachname').value.trim(),
+      email: document.getElementById('nu_email').value.trim(),
+      telefon: document.getElementById('nu_telefon').value.trim(),
+      username: document.getElementById('nu_username').value.trim(),
+      password: document.getElementById('nu_password').value,
+      rechte: {
+        revier: document.getElementById('nu_revier').checked,
+        park: document.getElementById('nu_park').checked,
+        name_sichtbar: document.getElementById('nu_name_sichtbar').checked,
+        name_verbergen: document.getElementById('nu_name_verbergen').checked,
+        plan_revier: document.getElementById('nu_plan_revier').checked,
+        plan_park: document.getElementById('nu_plan_park').checked,
+        lesen: document.getElementById('nu_lesen').checked,
+        admin: document.getElementById('nu_admin').checked,
+      },
+    };
+    if (!data.vorname || !data.nachname || !data.email || !data.telefon || !data.username || !data.password) {
+      showNuErr('Bitte alle Pflichtfelder ausfüllen.'); return;
+    }
+    if (data.password.length < 6) { showNuErr('Passwort mind. 6 Zeichen.'); return; }
+    if (data.username.length < 3) { showNuErr('Benutzername mind. 3 Zeichen.'); return; }
+    try {
+      await api.createUser(data);
+      toast('Benutzer angelegt');
+      ov.remove(); box.remove();
+      loadUsersTab();
+    } catch (err) { showNuErr('Fehler: ' + err.message); }
+  };
+  box.querySelector('#nu_close_btn').onclick = () => { ov.remove(); box.remove(); };
+  document.body.appendChild(ov);
+  document.body.appendChild(box);
 }
 
 function openUserEditPopup(userId) {
