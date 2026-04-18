@@ -1044,9 +1044,9 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
         <p class="field-hint">Für die Kontoverwaltung</p>
       </div>
       <div class="field-group">
-        <label>Telefon</label>
-        <input id="regTelefon" type="tel" placeholder="Telefon (optional)" autocomplete="tel">
-        <p class="field-hint">Mobilnummer (optional)</p>
+        <label>Telefon *</label>
+        <input id="regTelefon" type="tel" placeholder="Telefon" autocomplete="tel">
+        <p class="field-hint">Mobilnummer für Erreichbarkeit</p>
       </div>
       <div class="field-group">
         <label>Benutzername *</label>
@@ -4187,8 +4187,12 @@ async function doRegister() {
   const password = document.getElementById('regPass').value;
   const password2 = document.getElementById('regPass2').value;
   // Validation
-  if (!vorname || !nachname || !email || !username || !password) {
+  if (!vorname || !nachname || !email || !telefon || !username || !password) {
     errEl.textContent = 'Bitte alle Pflichtfelder ausfüllen.';
+    errEl.style.display = 'block'; return;
+  }
+  if (!/^[0-9 +()\/\-]{5,}$/.test(telefon)) {
+    errEl.textContent = 'Bitte gültige Telefonnummer eingeben (mind. 5 Zeichen, nur Zahlen/Leerzeichen/+/-).';
     errEl.style.display = 'block'; return;
   }
   if (username.length < 3) {

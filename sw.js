@@ -11,7 +11,7 @@
  *      Fehlerantwort, die der Client interpretieren kann.
  */
 
-const CACHE_NAME = 'jagdrevier-prad-v24';
+const CACHE_NAME = 'jagdrevier-prad-v25';
 const APP_SHELL = [
   './',
   './index.html',
