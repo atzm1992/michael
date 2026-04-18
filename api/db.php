@@ -225,6 +225,21 @@ function ensureSchema(): void {
     try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN user_id INT NULL AFTER name"); }
     catch (PDOException $e) { /* exists */ }
 
+    // Migration: bestehende Admin-Accounts (rolle='admin') bekommen automatisch
+    // alle Rechte. So sieht auch der Ur-Admin aus der alten Version wieder
+    // alle Namen, den kompletten Plan etc.
+    try {
+        $pdo->exec("UPDATE users SET
+            recht_admin = 1,
+            recht_revier = 1,
+            recht_park = 1,
+            recht_lesen = 1,
+            recht_name_sichtbar = 1,
+            recht_plan_revier = 1,
+            recht_plan_park = 1
+          WHERE rolle = 'admin' AND recht_admin = 0");
+    } catch (PDOException $e) { /* Spalten evtl. noch nicht da */ }
+
     // Default-Admin anlegen, falls users leer
     $count = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
     if ($count === 0) {

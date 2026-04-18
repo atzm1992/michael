@@ -81,11 +81,12 @@ function requireOwnEntry(array $entry): void {
  */
 function maskNameForUser(array $entry, array $currentUser, array $userRechteMap): string {
     $rechte = $currentUser['rechte'] ?? [];
+    $rolle  = $currentUser['rolle']  ?? '';
     $myId   = (int) ($currentUser['id'] ?? 0);
     $creatorId = $entry['user_id'] !== null ? (int) $entry['user_id'] : null;
 
-    // Admin oder Leserechte: alles sehen
-    if (!empty($rechte['admin']) || !empty($rechte['lesen'])) {
+    // Admin (per Rolle ODER Rechte-Flag) oder Leserechte: alles sehen
+    if ($rolle === 'admin' || !empty($rechte['admin']) || !empty($rechte['lesen'])) {
         return $entry['name'] ?? '---';
     }
 

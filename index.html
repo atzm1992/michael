@@ -4694,9 +4694,25 @@ function openUserEditPopup(userId) {
   box.onclick = ev => ev.stopPropagation();
 
   const isAktiv = !(u.aktiv === false || u.aktiv === 0 || u.aktiv === '0');
+  // Eigener Account? Dann sind alle Rechte + Aktiv-Status gesperrt,
+  // damit sich der Admin nicht versehentlich selbst die Rechte entzieht
+  // oder deaktiviert.
+  const isSelf = currentUserData && Number(u.id) === Number(currentUserData.id);
+  const dis = isSelf ? 'disabled' : '';
+  const selfHint = isSelf
+    ? '<p class="hint" style="color:var(--rot);">Eigene Rechte und Status können nicht geändert werden. Bitte einen anderen Admin damit beauftragen.</p>'
+    : '';
+
+  const statusSection = isSelf ? '' : `
+    <div class="profile-section">
+      <h4>Status</h4>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+        <input type="checkbox" id="ue_aktiv" ${isAktiv?'checked':''} style="width:auto;margin:0;"> Aktiv (kann sich anmelden)
+      </label>
+    </div>`;
 
   box.innerHTML = `
-    <h3>Benutzer bearbeiten</h3>
+    <h3>Benutzer bearbeiten${isSelf ? ' (Du selbst)' : ''}</h3>
     <div class="profile-section">
       <h4>Profil</h4>
       <div class="profile-info">
@@ -4708,41 +4724,37 @@ function openUserEditPopup(userId) {
     </div>
     <div class="profile-section">
       <h4>Berechtigungen</h4>
-      <div style="display:flex;flex-direction:column;gap:6px;">
+      ${selfHint}
+      <div style="display:flex;flex-direction:column;gap:6px;${isSelf ? 'opacity:0.6;' : ''}">
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-          <input type="checkbox" id="ue_revier" ${rechte.revier?'checked':''} style="width:auto;margin:0;"> Zugriff auf Revier
+          <input type="checkbox" id="ue_revier" ${rechte.revier?'checked':''} ${dis} style="width:auto;margin:0;"> Zugriff auf Revier
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-          <input type="checkbox" id="ue_park" ${rechte.park?'checked':''} style="width:auto;margin:0;"> Zugriff auf Park
+          <input type="checkbox" id="ue_park" ${rechte.park?'checked':''} ${dis} style="width:auto;margin:0;"> Zugriff auf Park
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-          <input type="checkbox" id="ue_name_sichtbar" ${rechte.name_sichtbar?'checked':''} style="width:auto;margin:0;"
+          <input type="checkbox" id="ue_name_sichtbar" ${rechte.name_sichtbar?'checked':''} ${dis} style="width:auto;margin:0;"
            onchange="if(this.checked) document.getElementById('ue_name_verbergen').checked=false;"> Namen sichtbar
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-          <input type="checkbox" id="ue_name_verbergen" ${rechte.name_verbergen?'checked':''} style="width:auto;margin:0;"
+          <input type="checkbox" id="ue_name_verbergen" ${rechte.name_verbergen?'checked':''} ${dis} style="width:auto;margin:0;"
            onchange="if(this.checked) document.getElementById('ue_name_sichtbar').checked=false;"> Namen verbergen
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-          <input type="checkbox" id="ue_plan_revier" ${rechte.plan_revier?'checked':''} style="width:auto;margin:0;"> Plan bearbeiten Revier
+          <input type="checkbox" id="ue_plan_revier" ${rechte.plan_revier?'checked':''} ${dis} style="width:auto;margin:0;"> Plan bearbeiten Revier
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-          <input type="checkbox" id="ue_plan_park" ${rechte.plan_park?'checked':''} style="width:auto;margin:0;"> Plan bearbeiten Park
+          <input type="checkbox" id="ue_plan_park" ${rechte.plan_park?'checked':''} ${dis} style="width:auto;margin:0;"> Plan bearbeiten Park
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-          <input type="checkbox" id="ue_lesen" ${rechte.lesen?'checked':''} style="width:auto;margin:0;"> Leserechte (sieht alle Namen)
+          <input type="checkbox" id="ue_lesen" ${rechte.lesen?'checked':''} ${dis} style="width:auto;margin:0;"> Leserechte (sieht alle Namen)
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-          <input type="checkbox" id="ue_admin" ${rechte.admin?'checked':''} style="width:auto;margin:0;"> Admin-Rechte
+          <input type="checkbox" id="ue_admin" ${rechte.admin?'checked':''} ${dis} style="width:auto;margin:0;"> Admin-Rechte
         </label>
       </div>
     </div>
-    <div class="profile-section">
-      <h4>Status</h4>
-      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
-        <input type="checkbox" id="ue_aktiv" ${isAktiv?'checked':''} style="width:auto;margin:0;"> Aktiv (kann sich anmelden)
-      </label>
-    </div>
+    ${statusSection}
     <div class="profile-section">
       <h4>Passwort zurücksetzen</h4>
       <div class="edit-row"><label>Neues Passwort</label><input id="ue_newpw" type="password" placeholder="Neues Passwort"></div>
@@ -4763,6 +4775,12 @@ function openUserEditPopup(userId) {
     } catch (err) { alert('Fehler: ' + err.message); }
   };
   box.querySelector('#ue_save_btn').onclick = async () => {
+    // Eigener Account: keine Rechte/Aktiv-Werte mitsenden. Backend
+    // blockiert das zusätzlich, aber hier sparen wir uns den Roundtrip.
+    if (isSelf) {
+      toast('Eigene Rechte können nicht geändert werden', 'warn');
+      return;
+    }
     const data = {
       rechte: {
         revier: document.getElementById('ue_revier').checked,

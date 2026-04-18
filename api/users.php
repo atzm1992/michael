@@ -151,6 +151,15 @@ if ($action === 'update') {
     $id = (int) ($in['id'] ?? 0);
     if ($id <= 0) jsonErr('id fehlt');
 
+    // Schutz: Admin darf weder eigene Rechte ändern noch sich selbst
+    // deaktivieren - sonst könnte er sich selbst aussperren.
+    $selfId = (int) ($_SESSION['uid'] ?? 0);
+    if ($id === $selfId) {
+        if (isset($in['rechte']) || array_key_exists('aktiv', $in)) {
+            jsonErr('Eigene Rechte und Status können nicht geändert werden. Bitte einen anderen Admin damit beauftragen.', 403);
+        }
+    }
+
     $user = $pdo->prepare('SELECT * FROM users WHERE id = :id');
     $user->execute([':id' => $id]);
     $user = $user->fetch();
