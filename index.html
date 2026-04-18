@@ -2277,11 +2277,11 @@ function openHelp() {
           : nameVerb
             ? "<li><b>Du hast &bdquo;Namen verbergen&ldquo;</b>: Dein Name wird " +
               "anderen nicht gezeigt, und du siehst selbst keine anderen " +
-              "Namen (stattdessen „---").</li>"
+              "Namen (stattdessen &bdquo;---&ldquo;).</li>"
             : nameSichtb
               ? "<li><b>Du hast &bdquo;Namen sichtbar&ldquo;</b>: Du siehst die " +
                 "Namen anderer Jäger, die ebenfalls &bdquo;sichtbar&ldquo; sind. " +
-                "Jäger mit &bdquo;Namen verbergen&ldquo; erscheinen als „---".</li>"
+                "Jäger mit &bdquo;Namen verbergen&ldquo; erscheinen als &bdquo;---&ldquo;.</li>"
               : "<li>Deine Name-Berechtigung ist eingeschränkt. Du siehst " +
                 "nur deinen eigenen Namen. Bitte den Admin um Freischaltung.</li>"
         ) +
@@ -4121,21 +4121,45 @@ async function doAuthLogin() {
   const u = document.getElementById('authUser').value.trim();
   const p = document.getElementById('authPass').value;
   const errEl = document.getElementById('loginError');
+  function showErr(msg) {
+    console.error('[Login] ' + msg);
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    } else {
+      alert(msg);
+    }
+  }
   if (!u || !p) {
-    errEl.textContent = 'Bitte Benutzername und Passwort eingeben.';
-    errEl.style.display = 'block';
+    showErr('Bitte Benutzername und Passwort eingeben.');
     return;
   }
+  // Schritt 1: Login beim Server
+  let r;
   try {
-    const r = await api.login(u, p);
+    console.log('[Login] Sende Login für', u);
+    r = await api.login(u, p);
+    console.log('[Login] Antwort:', r);
+  } catch (err) {
+    showErr(err.message || 'Login fehlgeschlagen');
+    return;
+  }
+  // Schritt 2: Userdaten übernehmen
+  try {
     applyUserData(r);
     document.getElementById('authPass').value = '';
-    errEl.style.display = 'none';
+    if (errEl) errEl.style.display = 'none';
     zeigeSeite('start');
+  } catch (err) {
+    showErr('Fehler beim Übernehmen der Userdaten: ' + (err.message || err));
+    return;
+  }
+  // Schritt 3: Daten laden (Fehler hier blockieren den Login nicht mehr)
+  try {
     await initAfterLogin();
   } catch (err) {
-    errEl.textContent = err.message || 'Login fehlgeschlagen';
-    errEl.style.display = 'block';
+    console.error('[Login] initAfterLogin fehlgeschlagen:', err);
+    toast('Anmeldung OK, aber Daten laden fehlgeschlagen: ' + (err.message || err), 'warn');
   }
 }
 
