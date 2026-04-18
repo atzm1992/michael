@@ -504,6 +504,28 @@ tr:hover { background: var(--gruen-l); }
 /* Platz für Bottom-Nav schaffen, damit der letzte Inhalt nicht darunter verschwindet */
 body.has-bottom-nav .container { padding-bottom: 90px; }
 
+/* PWA Install Banner */
+#pwaInstallBanner {
+  display: none;
+  position: fixed;
+  bottom: 80px; left: 50%; transform: translateX(-50%);
+  width: 92%; max-width: 400px;
+  background: #fff; border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+  padding: 14px 16px; z-index: 1600;
+  text-align: center;
+}
+#pwaInstallBanner .pwa-title {
+  font-weight: bold; font-size: 15px; color: var(--gruen-d); margin-bottom: 6px;
+}
+#pwaInstallBanner .pwa-text {
+  font-size: 13px; color: #555; margin-bottom: 12px;
+}
+#pwaInstallBanner .pwa-btns {
+  display: flex; gap: 8px; justify-content: center;
+}
+#pwaInstallBanner .pwa-btns button { min-width: 100px; }
+
 /* Toast-Benachrichtigungen */
 .toast-box {
   position: fixed;
@@ -794,6 +816,14 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 <button id="adminFab" class="admin-fab" onclick="showLogin()" title="Admin">🔐</button>
 
 <!-- Toast-Container für Erfolgsmeldungen -->
+<div id="pwaInstallBanner">
+  <div class="pwa-title">App installieren</div>
+  <div class="pwa-text">Installiere die Abschussliste als App auf deinem Gerät für schnelleren Zugriff und Offline-Nutzung.</div>
+  <div class="pwa-btns">
+    <button onclick="pwaInstallAccept()">Installieren</button>
+    <button class="sec" onclick="pwaInstallDismiss()">Später</button>
+  </div>
+</div>
 <div id="toastBox" class="toast-box"></div>
 
 <!-- Mobile Bottom-Navigation -->
@@ -1417,6 +1447,42 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+/* ---------- PWA: Install-Prompt abfangen und Banner zeigen ---------- */
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', ev => {
+  ev.preventDefault();
+  deferredInstallPrompt = ev;
+  // Nur zeigen, wenn User nicht vorher abgelehnt hat (sessionStorage)
+  if (!sessionStorage.getItem('pwaInstallDismissed')) {
+    setTimeout(() => {
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner) banner.style.display = 'block';
+    }, 3000);
+  }
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+  toast('App erfolgreich installiert!');
+});
+function pwaInstallAccept() {
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then(result => {
+      deferredInstallPrompt = null;
+      if (result.outcome === 'accepted') toast('App wird installiert...');
+    });
+  }
+}
+function pwaInstallDismiss() {
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+  sessionStorage.setItem('pwaInstallDismissed', '1');
+}
+
 /* ---------- Online/Offline-Indikator ---------- */
 let isOnline = navigator.onLine;
 window.addEventListener('online',  () => { isOnline = true;  flushOutbox(); updateOfflineBanner(); });
@@ -1688,6 +1754,7 @@ function dbToClient(row) {
     ist_park:     !!row.ist_park,
     ist_fallwild: !!row.ist_fallwild,
     wetter:       row.wetter || "",
+    user_id:      row.user_id != null ? Number(row.user_id) : null,
   };
 }
 function clientToDb(ev) {
@@ -3025,11 +3092,20 @@ function skipGewicht() {
 
 /* Erzeugt die HTML-Zelle für das Gewicht - entweder den Wert,
    einen Strich oder den klickbaren "Gewicht eintragen"-Button. */
+function isOwnEntry(d) {
+  if (!currentUserData || !currentUserData.id) return false;
+  return d.user_id != null && Number(d.user_id) === Number(currentUserData.id);
+}
+
+function canEditEntry(d) {
+  return isAdmin || isOwnEntry(d);
+}
+
 function renderGewichtCell(d) {
   if (d.gewicht != null && d.gewicht !== "") {
     return d.gewicht + " kg";
   }
-  // Leeres Gewicht: erlauben, einmalig nachzutragen, solange nicht gemeldet
+  if (!canEditEntry(d)) return "–";
   if (d.gemeldet && !isAdmin) return "–";
   return `<span class="tag-btn" style="background:#757575;color:#fff;cursor:pointer;"
             onclick="event.stopPropagation();setGewichtLater(${d.id})">
@@ -3631,21 +3707,24 @@ function anzeigen() {
 
     // Entnommen
     const ec = r.insertCell();
-    if (!d.entnommen) {
+    if (!d.entnommen && canEditEntry(d)) {
       ec.innerHTML = `<span class="tag-btn tag-ent" onclick="pickDate(${ri})">+</span>
         <input type="date" id="dt${ri}" style="display:none;width:auto;" onchange="setEntnommen(${ri},this.value)">`;
-    } else {
+    } else if (d.entnommen) {
       ec.innerText = formatDatum(d.entnommen);
       ec.style.background = "#e8f5e9";
+    } else {
+      ec.innerText = "–";
     }
 
     r.insertCell().innerText = d.verwendung||"";
 
     // Abfall
     const ac = r.insertCell();
-    if (d.abfall==null) ac.innerHTML = `<span class="tag-btn tag-abf" onclick="handleAbfall(${ri})">+</span>`;
+    if (d.abfall==null && canEditEntry(d)) ac.innerHTML = `<span class="tag-btn tag-abf" onclick="handleAbfall(${ri})">+</span>`;
     else if (d.abfall==="ja") ac.innerHTML = `<span class="tag-btn tag-ja">Ja</span>`;
-    else ac.innerHTML = `<span class="tag-btn tag-nein">Nein</span>`;
+    else if (d.abfall==="nein") ac.innerHTML = `<span class="tag-btn tag-nein">Nein</span>`;
+    else ac.innerText = "–";
 
     // Admin column
     if (isAdmin) {
@@ -3669,15 +3748,19 @@ function anzeigen() {
       ? `<span class="link" onclick="event.stopPropagation();openMapFromTable(${ri})">${esc(d.ort||'Karte')} 📍</span>`
       : esc(d.ort||"");
 
-    let entH = !d.entnommen
+    let entH = !d.entnommen && canEditEntry(d)
       ? `<span class="tag-btn tag-ent" onclick="event.stopPropagation();pickDate(${ri})">+ Entnahme</span><input type="date" id="mdt${ri}" style="display:none;" onchange="setEntnommen(${ri},this.value)">`
-      : `<span class="tag-btn tag-done">${formatDatum(d.entnommen)}</span>`;
+      : d.entnommen
+        ? `<span class="tag-btn tag-done">${formatDatum(d.entnommen)}</span>`
+        : `<span style="color:#999;">–</span>`;
 
-    let abfH = d.abfall==null
+    let abfH = d.abfall==null && canEditEntry(d)
       ? `<span class="tag-btn tag-abf" onclick="event.stopPropagation();handleAbfall(${ri})">+ Abfall</span>`
       : d.abfall==="ja"
         ? `<span class="tag-btn tag-ja">Abfall: Ja</span>`
-        : `<span class="tag-btn tag-nein">Abfall: Nein</span>`;
+        : d.abfall==="nein"
+          ? `<span class="tag-btn tag-nein">Abfall: Nein</span>`
+          : `<span style="color:#999;">–</span>`;
 
     let adminH = isAdmin
       ? `<span class="tag-btn tag-edit" onclick="event.stopPropagation();openEdit(${ri})">✏️</span> <span class="tag-btn tag-del" onclick="event.stopPropagation();loeschen(${ri})">✕</span>`
@@ -4479,14 +4562,16 @@ function openUserEditPopup(userId) {
   };
   box.querySelector('#ue_save_btn').onclick = async () => {
     const data = {
-      recht_revier: document.getElementById('ue_revier').checked ? 1 : 0,
-      recht_park: document.getElementById('ue_park').checked ? 1 : 0,
-      recht_name_sichtbar: document.getElementById('ue_name_sichtbar').checked ? 1 : 0,
-      recht_name_verbergen: document.getElementById('ue_name_verbergen').checked ? 1 : 0,
-      recht_plan_revier: document.getElementById('ue_plan_revier').checked ? 1 : 0,
-      recht_plan_park: document.getElementById('ue_plan_park').checked ? 1 : 0,
-      recht_lesen: document.getElementById('ue_lesen').checked ? 1 : 0,
-      recht_admin: document.getElementById('ue_admin').checked ? 1 : 0,
+      rechte: {
+        revier: document.getElementById('ue_revier').checked,
+        park: document.getElementById('ue_park').checked,
+        name_sichtbar: document.getElementById('ue_name_sichtbar').checked,
+        name_verbergen: document.getElementById('ue_name_verbergen').checked,
+        plan_revier: document.getElementById('ue_plan_revier').checked,
+        plan_park: document.getElementById('ue_plan_park').checked,
+        lesen: document.getElementById('ue_lesen').checked,
+        admin: document.getElementById('ue_admin').checked,
+      },
       aktiv: document.getElementById('ue_aktiv').checked ? 1 : 0,
     };
     try {
