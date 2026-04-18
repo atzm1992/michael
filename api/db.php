@@ -225,9 +225,9 @@ function ensureSchema(): void {
     try { $pdo->exec("ALTER TABLE eintraege ADD COLUMN user_id INT NULL AFTER name"); }
     catch (PDOException $e) { /* exists */ }
 
-    // Migration: bestehende Admin-Accounts (rolle='admin') bekommen automatisch
-    // alle Rechte. So sieht auch der Ur-Admin aus der alten Version wieder
-    // alle Namen, den kompletten Plan etc.
+    // Migration: alle Admin-Accounts (rolle='admin') bekommen IMMER alle
+    // Rechte gesetzt. Doppelte Absicherung zur Laufzeit-Logik in
+    // loadUserRechte().
     try {
         $pdo->exec("UPDATE users SET
             recht_admin = 1,
@@ -235,9 +235,11 @@ function ensureSchema(): void {
             recht_park = 1,
             recht_lesen = 1,
             recht_name_sichtbar = 1,
+            recht_name_verbergen = 0,
             recht_plan_revier = 1,
-            recht_plan_park = 1
-          WHERE rolle = 'admin' AND recht_admin = 0");
+            recht_plan_park = 1,
+            aktiv = 1
+          WHERE rolle = 'admin'");
     } catch (PDOException $e) { /* Spalten evtl. noch nicht da */ }
 
     // Default-Admin anlegen, falls users leer
@@ -374,6 +376,21 @@ function checkSessionTimeout(): void {
 }
 
 function loadUserRechte(array $row): array {
+    // Admins haben IMMER alle Rechte - unabhängig von den DB-Flags. So
+    // kann der Admin sich nicht versehentlich aussperren und hat in Plan,
+    // Karte und Listen automatisch Vollzugriff.
+    if (($row['rolle'] ?? '') === 'admin') {
+        return [
+            'revier'          => true,
+            'park'            => true,
+            'name_sichtbar'   => true,
+            'name_verbergen'  => false, // "Verbergen" für Admin sinnlos
+            'plan_revier'     => true,
+            'plan_park'       => true,
+            'lesen'           => true,
+            'admin'           => true,
+        ];
+    }
     return [
         'revier'          => (int) ($row['recht_revier'] ?? 0) === 1,
         'park'            => (int) ($row['recht_park'] ?? 0) === 1,
