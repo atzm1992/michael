@@ -100,6 +100,7 @@ if ($action === 'register') {
     $nachname = trim((string) ($in['nachname'] ?? ''));
     $email    = trim((string) ($in['email'] ?? ''));
     $telefon  = trim((string) ($in['telefon'] ?? ''));
+    $consent  = !empty($in['consent']);
 
     if ($username === '') jsonErr('Benutzername erforderlich');
     if (strlen($username) < 3) jsonErr('Benutzername muss mindestens 3 Zeichen lang sein');
@@ -112,6 +113,7 @@ if ($action === 'register') {
     if ($nachname === '') jsonErr('Nachname erforderlich');
     if ($email === '') jsonErr('E-Mail erforderlich');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonErr('Ungültige E-Mail-Adresse');
+    if (!$consent) jsonErr('Zustimmung zur Datenschutzerklärung erforderlich');
 
     // Prüfen ob Username schon vergeben
     $check = db()->prepare('SELECT id FROM users WHERE username = :u LIMIT 1');
@@ -121,10 +123,13 @@ if ($action === 'register') {
     }
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
+    $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+    if (str_contains($ip, ',')) $ip = trim(explode(',', $ip)[0]);
+    $ip = substr($ip, 0, 45);
     $stmt = db()->prepare(
         'INSERT INTO users (username, pass_hash, vorname, nachname, email, telefon, rolle,
-         recht_revier, recht_name_sichtbar, aktiv)
-         VALUES (:u, :h, :vn, :nn, :em, :tel, :rolle, 1, 1, 1)'
+         recht_revier, recht_name_sichtbar, aktiv, consent_at, consent_ip)
+         VALUES (:u, :h, :vn, :nn, :em, :tel, :rolle, 1, 1, 1, NOW(), :ip)'
     );
     $stmt->execute([
         ':u'     => $username,
@@ -134,6 +139,7 @@ if ($action === 'register') {
         ':em'    => $email,
         ':tel'   => $telefon,
         ':rolle' => 'jaeger',
+        ':ip'    => $ip,
     ]);
     $newId = (int) db()->lastInsertId();
 
