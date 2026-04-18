@@ -608,7 +608,7 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   font-size: 14px;
 }
 
-.admin-section { margin: 12px 0; padding: 12px; background: #f5f5f5; border-radius: var(--radius); }
+.admin-section { margin: 12px 0; padding: 12px; background: #f5f5f5; border-radius: var(--radius); overflow-x: hidden; max-width: 100%; box-sizing: border-box; }
 .admin-section h4 { margin-bottom: 8px; color: var(--gruen-d); }
 .admin-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
 .admin-row label { min-width: 120px; font-size: 14px; }
@@ -661,81 +661,80 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 .plan-ist tr.over td { color: var(--rot); font-weight: bold; }
 
 /* Plan-Editor (Admin) */
-.plan-group { margin: 12px 0; padding: 8px 10px; background: #f7f7f7; border-radius: 6px; }
+.plan-group { margin: 12px 0; padding: 8px 10px; background: #f7f7f7; border-radius: 6px; max-width: 100%; box-sizing: border-box; overflow-x: hidden; }
 .plan-group h5 {
   margin: 0 0 6px; color: var(--gruen-d);
   display: flex; justify-content: space-between; align-items: center;
   font-size: 14px;
 }
-.plan-edit { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+.plan-edit { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: auto; }
 .plan-edit th, .plan-edit td { padding: 3px 4px; border-bottom: 1px solid #e0e0e0; text-align: left; }
 .plan-edit th { background: var(--gruen); color: #fff; text-align: left; font-weight: 600; }
 .plan-edit input[type="number"],
-.plan-edit input[type="text"] { margin: 0; padding: 4px 6px; width: 100%; min-width: 0; }
+.plan-edit input[type="text"] { margin: 0; padding: 4px 6px; min-width: 0; box-sizing: border-box; }
 .plan-edit input[type="checkbox"] { width: 18px; height: 18px; }
 
-/* Plan-Bearbeiter auf Mobile: Karten-Layout mit 2 Zeilen pro Eintrag */
+/* Plan-Bearbeiter auf Mobile: vertikal stacked mit klaren Labels */
 @media (max-width: 700px) {
-  .plan-edit, .plan-edit tr, .plan-edit td { display: block; }
+  .plan-edit, .plan-edit tbody, .plan-edit tr, .plan-edit td {
+    display: block; width: 100%; box-sizing: border-box;
+  }
   .plan-edit thead, .plan-edit tr > th { display: none; }
   .plan-edit tr {
-    border: 1px solid #e0e0e0;
+    border: 1px solid #ccc;
     border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
     background: #fff;
-    display: grid;
-    grid-template-columns: auto 1fr 70px 70px auto;
-    grid-template-rows: auto auto;
-    gap: 6px 8px;
-    align-items: center;
   }
-  .plan-edit td { padding: 0; border: none; }
-  /* Zeile 1: ✓, Klasse (füllt), Plan, Extern, ✕ */
-  .plan-edit td:nth-child(1) { grid-row: 1; grid-column: 1; }
-  .plan-edit td:nth-child(2) { grid-row: 1; grid-column: 2; }
-  .plan-edit td:nth-child(3) { grid-row: 1; grid-column: 3; }
-  .plan-edit td:nth-child(3)::before { content: "Plan: "; font-size: 11px; color: var(--grau); }
-  .plan-edit td:nth-child(4) { grid-row: 1; grid-column: 4; }
-  .plan-edit td:nth-child(4)::before { content: "Extern: "; font-size: 11px; color: var(--grau); }
-  .plan-edit td:nth-child(6) { grid-row: 1; grid-column: 5; }
-  /* Zeile 2: "Zählt als" über volle Breite */
-  .plan-edit td:nth-child(5) { grid-row: 2; grid-column: 1 / -1; }
-  .plan-edit td:nth-child(5)::before { content: "Zählt als: "; font-size: 11px; color: var(--grau); }
+  .plan-edit td { padding: 3px 0; border: none; position: relative; }
+  .plan-edit td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    color: var(--grau);
+    margin-bottom: 2px;
+    font-weight: 500;
+  }
+  /* Hardcoded inline widths der inputs überschreiben */
+  .plan-edit input[type="text"],
+  .plan-edit input[type="number"] { width: 100% !important; max-width: 100%; }
+  .plan-edit input[type="checkbox"] { width: 18px !important; }
+  /* Checkbox und Lösch-Button kompakt nebeneinander */
+  .plan-edit td.pe-check { display: inline-block; width: auto; vertical-align: middle; margin-right: 10px; }
+  .plan-edit td.pe-check::before { display: none; }
+  .plan-edit td.pe-del { display: inline-block; width: auto; float: right; }
+  .plan-edit td.pe-del::before { display: none; }
 }
 
 /* Meldeliste im Admin */
-.meld-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.meld-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
 .meld-table td {
   border-bottom: 1px solid #e0e0e0;
   padding: 6px;
   vertical-align: middle;
+  word-break: break-word;
 }
 .meld-table td:first-child { text-align: left; }
-.meld-table td:last-child { text-align: right; }
+.meld-table td:last-child { text-align: right; white-space: nowrap; }
 
 /* Meldungs-Liste auf Mobile: 2 Zeilen pro Eintrag */
 @media (max-width: 700px) {
-  .meld-table, .meld-table tr, .meld-table td { display: block; }
+  .meld-table, .meld-table tbody, .meld-table tr, .meld-table td {
+    display: block; width: 100%; box-sizing: border-box;
+  }
   .meld-table tr {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 8px 10px;
-    margin-bottom: 6px;
+    padding: 10px;
+    margin-bottom: 8px;
     background: #fff;
   }
-  .meld-table td { border: none; padding: 2px 0; }
-  .meld-table td:first-child { font-weight: 500; }
-  .meld-table td:nth-child(2) {
-    display: inline-block;
-    margin-right: 10px;
-    font-size: 12px;
-  }
-  .meld-table td:last-child {
-    display: inline-block;
-    text-align: left;
-  }
-  .meld-table td:last-child button { padding: 4px 10px; font-size: 12px; }
+  .meld-table td { border: none; padding: 2px 0; white-space: normal; }
+  .meld-table td:first-child { font-weight: 500; font-size: 13px; }
+  .meld-table td:nth-child(2) { font-size: 12px; color: var(--grau); padding-bottom: 6px; }
+  .meld-table td:last-child { text-align: left; }
+  .meld-table td:last-child button { padding: 6px 14px; font-size: 13px; }
 }
 
 /* Hilfe-Popup: kompakte Accordion-Struktur */
@@ -3025,15 +3024,15 @@ function planEditorRow(art, klasse, row) {
   const extVal  = row ? (row.extern || 0) : 0;
   const matches = row ? (row.matches || "") : "";
   return `<tr data-art="${esc(art)}">
-    <td><input type="checkbox" ${checked} class="pe-en"></td>
-    <td><input type="text" class="pe-k"  value="${esc(klasse)}" style="width:110px;padding:4px;"></td>
-    <td><input type="number" class="pe-p" min="0" value="${planVal}" style="width:60px;padding:4px;"></td>
-    <td><input type="number" class="pe-x" min="0" value="${extVal}"  style="width:60px;padding:4px;"
+    <td class="pe-check" data-label="✓"><input type="checkbox" ${checked} class="pe-en"></td>
+    <td data-label="Klasse"><input type="text" class="pe-k" value="${esc(klasse)}"></td>
+    <td data-label="Plan"><input type="number" class="pe-p" min="0" value="${planVal}"></td>
+    <td data-label="Extern"><input type="number" class="pe-x" min="0" value="${extVal}"
          title="Extern erlegte Tiere (werden vom Plan abgezogen, aber nicht als Ist gezählt)"></td>
-    <td><input type="text" class="pe-m" value="${esc(matches)}"
-         placeholder="z.B. T-Hirsch,J-Hirsch" style="width:160px;padding:4px;"
+    <td data-label="Zählt als (optional)"><input type="text" class="pe-m" value="${esc(matches)}"
+         placeholder="z.B. T-Hirsch,J-Hirsch"
          title="Mehrere Wild-Klassen mit Komma trennen, z.B. T-Hirsch,J-Hirsch"></td>
-    <td><button class="sm" style="background:#c62828;padding:2px 6px;" onclick="this.closest('tr').remove()">✕</button></td>
+    <td class="pe-del"><button class="sm" style="background:#c62828;padding:2px 10px;" onclick="this.closest('tr').remove()">✕</button></td>
   </tr>`;
 }
 
