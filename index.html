@@ -829,7 +829,7 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 
   <div class="topbar">
     <button id="btnPark" onclick="openRevierMode('park')">🌲 Park</button>
-    <button onclick="openRevierMode('revier')">🎯 Revier</button>
+    <button id="btnRevier" onclick="openRevierMode('revier')">🎯 Revier</button>
   </div>
 </div>
 
@@ -875,7 +875,7 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     <button onclick="setWild('Hase')">Hase</button>
     <button onclick="zeigeSeite('wf-andere')">Andere</button>
   </div>
-  <button class="sec full" onclick="zeigeSeite('wf-name')">⬅ Zurück</button>
+  <button class="sec full" onclick="wfBackToName()">⬅ Zurück</button>
   <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
@@ -901,7 +901,7 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     <button onclick="setWildDetail('Rotwild','Schmaltier')">Schmaltier</button>
     <button onclick="setWildDetail('Rotwild','Kalb')">Kalb</button>
   </div>
-  <button class="sec full" onclick="zeigeSeite(e.ist_park ? 'wf-name' : 'wf-wild')">⬅ Zurück</button>
+  <button class="sec full" onclick="wfBackFromHirsch()">⬅ Zurück</button>
   <button class="sec full" onclick="workflowAbort()" style="color:#c62828;">✕ Abbrechen</button>
 </div>
 
@@ -1889,11 +1889,18 @@ function applyConfig() {
     const planVisible = (config.planVisible !== false) || isAdmin;
     btnPlan.style.display = planVisible ? "" : "none";
   }
-  // Park-Button auf Startseite: gleiche Logik
+  // Park-Button auf Startseite: visible if config allows AND user has park permission
   const btnPark = document.getElementById("btnPark");
   if (btnPark) {
-    const parkVisible = (config.parkVisible !== false) || isAdmin;
-    btnPark.style.display = parkVisible ? "" : "none";
+    const parkConfigVisible = (config.parkVisible !== false) || isAdmin;
+    const parkPermission = isAdmin || userRechte.park;
+    btnPark.style.display = (parkConfigVisible && parkPermission) ? "" : "none";
+  }
+  // Revier-Button on start page: visible if user has revier permission
+  const btnRevierStart = document.getElementById("btnRevier");
+  if (btnRevierStart) {
+    const revierVisible = isAdmin || !currentUserData || userRechte.revier !== false;
+    btnRevierStart.style.display = revierVisible ? "" : "none";
   }
   // Checkboxen im Admin-Panel
   const cfgPlan = document.getElementById("cfgPlanVisible");
@@ -2736,10 +2743,10 @@ async function toggleGemeldet(id) {
   } catch (err) {
     if (String(err.message).includes('Nicht eingeloggt') ||
         String(err.message).includes('Nur für Admin')) {
-      alert("Admin-Session abgelaufen. Bitte oben rechts neu einloggen.");
-      isAdmin = false;
+      alert("Admin-Session abgelaufen. Bitte erneut anmelden.");
+      isAdmin = false; currentUserData = null; userRechte = {};
       applyConfig();
-      zeigeSeite('admin-login');
+      zeigeSeite('auth-page');
     } else {
       alert("Speichern fehlgeschlagen: " + err.message);
     }
@@ -2767,8 +2774,60 @@ function neuerEintrag() {
   document.getElementById("inputZeit").value =
     String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
   document.getElementById("inputDatum").value = now.toISOString().slice(0,10);
-  buildNameSugg();
-  zeigeSeite("wf-name");
+
+  // Non-admin: auto-fill name from logged-in user and skip name page
+  if (!isAdmin && currentUserData && currentUserData.vorname) {
+    e.name = (currentUserData.vorname + ' ' + (currentUserData.nachname || '')).trim();
+    document.getElementById("inputName").value = e.name;
+    if (e.ist_park) {
+      zeigeSeite("wf-hirsch");
+    } else {
+      zeigeSeite("wf-wild");
+    }
+  } else if (isAdmin) {
+    // Admin: show name page with user dropdown
+    buildAdminNameSelect();
+    zeigeSeite("wf-name");
+  } else {
+    buildNameSugg();
+    zeigeSeite("wf-name");
+  }
+}
+
+/* Admin name select: dropdown of registered users + custom input */
+async function buildAdminNameSelect() {
+  const container = document.getElementById("nameSuggestions");
+  container.innerHTML = '<p class="hint">Lade Benutzerliste...</p>';
+  try {
+    const names = await api.listNames();
+    container.innerHTML = '';
+    if (Array.isArray(names) && names.length) {
+      const sel = document.createElement('select');
+      sel.id = 'adminNameSelect';
+      sel.style.marginBottom = '6px';
+      const phOpt = document.createElement('option');
+      phOpt.value = ''; phOpt.textContent = '-- Benutzer wählen --';
+      sel.appendChild(phOpt);
+      names.forEach(n => {
+        const o = document.createElement('option');
+        const fullName = ((n.vorname || '') + ' ' + (n.nachname || '')).trim();
+        o.value = fullName;
+        o.textContent = fullName + (n.username ? ' (' + n.username + ')' : '');
+        sel.appendChild(o);
+      });
+      sel.onchange = () => {
+        document.getElementById('inputName').value = sel.value;
+      };
+      container.appendChild(sel);
+    }
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.textContent = 'Oder Namen manuell eingeben.';
+    container.appendChild(hint);
+  } catch (_) {
+    container.innerHTML = '';
+    buildNameSugg();
+  }
 }
 
 /* Merkt einen verwendeten Namen lokal (pro Gerät) für die Autocomplete-
@@ -3005,8 +3064,6 @@ async function finishSave() {
   e.entnommen = null;
   e.abfall = null;
   e.gemeldet = false;
-  // Namen lokal für Autocomplete merken (neueste zuerst, max 8)
-  rememberNameLocally(e.name);
   const body = clientToDb(e);
   try {
     // Wenn offline: direkt in Outbox, ohne API-Versuch
@@ -3749,8 +3806,8 @@ async function saveEdit(id) {
     console.error('[Edit] saveEdit failed:', err);
     if (String(err.message).includes('Nicht eingeloggt') ||
         String(err.message).includes('Nur für Admin')) {
-      alert("Admin-Session abgelaufen. Bitte oben rechts neu einloggen.");
-      isAdmin = false;
+      alert("Admin-Session abgelaufen. Bitte erneut anmelden.");
+      isAdmin = false; currentUserData = null; userRechte = {};
       applyConfig();
     } else {
       alert("Speichern fehlgeschlagen: " + err.message);
@@ -3838,11 +3895,15 @@ function bnMore() {
     }
   }
   items.push({ icon: "❓", label: "Hilfe", action: () => { close(); openHelp(); } });
+  items.push({ icon: "📜", label: "Impressum & Datenschutz", action: () => { close(); zeigeSeite('impressum'); } });
+  if (currentUserData && currentUserData.logged_in) {
+    items.push({ icon: "👤", label: "Profil", action: () => { close(); openProfilePopup(); } });
+  }
   if (isAdmin) {
     items.push({ icon: "⚙️", label: "Admin-Einstellungen", action: () => { close(); showLogin(); } });
-    items.push({ icon: "🔓", label: "Admin abmelden", action: () => { close(); adminLogoutFull(); } });
-  } else {
-    items.push({ icon: "🔐", label: "Admin-Login", action: () => { close(); showLogin(); } });
+    items.push({ icon: "🔓", label: "Abmelden", action: () => { close(); doFullLogout(); } });
+  } else if (currentUserData && currentUserData.logged_in) {
+    items.push({ icon: "🔓", label: "Abmelden", action: () => { close(); doFullLogout(); } });
   }
   box.innerHTML = '<div style="font-size:13px;color:#666;margin-bottom:4px;text-align:center;">Mehr Aktionen</div>';
   items.forEach(it => {
@@ -3866,8 +3927,8 @@ function updateBottomNav() {
   if (!nav) return;
   const currentPage = document.querySelector(".page.active");
   const pageId = currentPage ? currentPage.id : "";
-  // Während des Workflows oder im Admin-Login die Bottom-Nav ausblenden
-  const hideOn = ["admin-login"];
+  // Während des Workflows, Login-Seite oder Admin-Login die Bottom-Nav ausblenden
+  const hideOn = ["admin-login", "auth-page"];
   const isWorkflow = pageId.startsWith("wf-");
   const hidden = isWorkflow || hideOn.includes(pageId);
   nav.style.display = hidden ? "none" : "flex";
@@ -3880,6 +3941,12 @@ function updateBottomNav() {
     fab.style.display = showFab ? "block" : "none";
   }
 
+  // Admin FAB: hide on auth page
+  const adminFab = document.getElementById("adminFab");
+  if (adminFab) {
+    adminFab.style.display = (pageId === "auth-page") ? "none" : "";
+  }
+
   // Aktiven Button markieren
   nav.querySelectorAll("button[data-page]").forEach(btn => {
     const p = btn.dataset.page;
@@ -3889,11 +3956,18 @@ function updateBottomNav() {
     if (p === "park")   active = (pageId === "revier" && appMode === "park");
     btn.classList.toggle("active", active);
   });
-  // Park-Button versteckt halten, wenn Admin ihn so konfiguriert hat
+  // Revier-Button: show only if user has rechte.revier (or admin, or no user data yet)
+  const revierBtn = nav.querySelector('button[data-page="revier"]');
+  if (revierBtn) {
+    const revierVisible = isAdmin || !currentUserData || userRechte.revier !== false;
+    revierBtn.style.display = revierVisible ? "" : "none";
+  }
+  // Park-Button: show only if user has rechte.park (or admin) AND config allows it
   const parkBtn = nav.querySelector('button[data-page="park"]');
   if (parkBtn) {
-    const parkVisible = (config.parkVisible !== false) || isAdmin;
-    parkBtn.style.display = parkVisible ? "" : "none";
+    const parkConfigVisible = (config.parkVisible !== false) || isAdmin;
+    const parkPermission = isAdmin || userRechte.park;
+    parkBtn.style.display = (parkConfigVisible && parkPermission) ? "" : "none";
   }
 }
 
@@ -3921,14 +3995,326 @@ function showLogin() {
   }
 }
 
+/* ---------- Auth: Login / Register / Profile ---------- */
+function showLoginForm() {
+  document.getElementById('loginBox').style.display = '';
+  document.getElementById('registerBox').style.display = 'none';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('registerError').style.display = 'none';
+}
+function showRegisterForm() {
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('registerBox').style.display = '';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('registerError').style.display = 'none';
+}
+
+async function doAuthLogin() {
+  const u = document.getElementById('authUser').value.trim();
+  const p = document.getElementById('authPass').value;
+  const errEl = document.getElementById('loginError');
+  if (!u || !p) {
+    errEl.textContent = 'Bitte Benutzername und Passwort eingeben.';
+    errEl.style.display = 'block';
+    return;
+  }
+  try {
+    const r = await api.login(u, p);
+    applyUserData(r);
+    document.getElementById('authPass').value = '';
+    errEl.style.display = 'none';
+    zeigeSeite('start');
+    await initAfterLogin();
+  } catch (err) {
+    errEl.textContent = err.message || 'Login fehlgeschlagen';
+    errEl.style.display = 'block';
+  }
+}
+
+async function doRegister() {
+  const errEl = document.getElementById('registerError');
+  const vorname = document.getElementById('regVorname').value.trim();
+  const nachname = document.getElementById('regNachname').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const telefon = document.getElementById('regTelefon').value.trim();
+  const username = document.getElementById('regUsername').value.trim();
+  const password = document.getElementById('regPass').value;
+  const password2 = document.getElementById('regPass2').value;
+  // Validation
+  if (!vorname || !nachname || !email || !username || !password) {
+    errEl.textContent = 'Bitte alle Pflichtfelder ausfüllen.';
+    errEl.style.display = 'block'; return;
+  }
+  if (username.length < 3) {
+    errEl.textContent = 'Benutzername muss mind. 3 Zeichen haben.';
+    errEl.style.display = 'block'; return;
+  }
+  if (password.length < 6) {
+    errEl.textContent = 'Passwort muss mind. 6 Zeichen haben.';
+    errEl.style.display = 'block'; return;
+  }
+  if (password !== password2) {
+    errEl.textContent = 'Passwörter stimmen nicht überein.';
+    errEl.style.display = 'block'; return;
+  }
+  try {
+    const r = await api.register({ vorname, nachname, email, telefon, username, password });
+    applyUserData(r);
+    errEl.style.display = 'none';
+    zeigeSeite('start');
+    await initAfterLogin();
+    toast('Registrierung erfolgreich!');
+  } catch (err) {
+    errEl.textContent = err.message || 'Registrierung fehlgeschlagen';
+    errEl.style.display = 'block';
+  }
+}
+
+/* Profile popup for logged-in users */
+function openProfilePopup() {
+  if (!currentUserData) return;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;display:block;';
+  const box = document.createElement('div');
+  box.className = 'popup';
+  box.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:20px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.3);z-index:1000;width:92%;max-width:400px;max-height:90vh;overflow-y:auto;display:block;';
+  ov.onclick = () => { ov.remove(); box.remove(); };
+  box.onclick = ev => ev.stopPropagation();
+
+  const ud = currentUserData;
+  box.innerHTML = `
+    <h3>Profil</h3>
+    <div class="profile-section">
+      <h4>Persönliche Daten</h4>
+      <div class="profile-info">
+        <div><span class="label">Name</span><br>${esc((ud.vorname||'') + ' ' + (ud.nachname||''))}</div>
+        <div style="margin-top:6px;"><span class="label">Benutzername</span><br>${esc(ud.username||'')}</div>
+        <div style="margin-top:6px;"><span class="label">E-Mail</span><br>${esc(ud.email||'')}</div>
+      </div>
+    </div>
+    <div class="profile-section">
+      <h4>Passwort ändern</h4>
+      <div class="edit-row"><label>Aktuelles Passwort</label><input id="profOldPw" type="password"></div>
+      <div class="edit-row"><label>Neues Passwort</label><input id="profNewPw" type="password"></div>
+      <div class="edit-row"><label>Neues Passwort bestätigen</label><input id="profNewPw2" type="password"></div>
+      <button class="sm" id="profChangePwBtn">Passwort ändern</button>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px;">
+      <button class="danger" id="profLogoutBtn" style="flex:1;">Abmelden</button>
+      <button class="sec" id="profCloseBtn" style="flex:1;">Schließen</button>
+    </div>`;
+  box.querySelector('#profChangePwBtn').onclick = async () => {
+    const op = document.getElementById('profOldPw').value;
+    const np = document.getElementById('profNewPw').value;
+    const np2 = document.getElementById('profNewPw2').value;
+    if (!op || !np) { alert('Bitte altes und neues Passwort eingeben.'); return; }
+    if (np.length < 6) { alert('Neues Passwort muss mind. 6 Zeichen haben.'); return; }
+    if (np !== np2) { alert('Passwörter stimmen nicht überein.'); return; }
+    try {
+      await api.changePassword(op, np);
+      toast('Passwort erfolgreich geändert');
+      document.getElementById('profOldPw').value = '';
+      document.getElementById('profNewPw').value = '';
+      document.getElementById('profNewPw2').value = '';
+    } catch (err) { alert('Passwort-Wechsel fehlgeschlagen: ' + err.message); }
+  };
+  box.querySelector('#profLogoutBtn').onclick = async () => {
+    ov.remove(); box.remove();
+    await doFullLogout();
+  };
+  box.querySelector('#profCloseBtn').onclick = () => { ov.remove(); box.remove(); };
+  document.body.appendChild(ov);
+  document.body.appendChild(box);
+}
+
+async function doFullLogout() {
+  try { await api.logout(); } catch (_) {}
+  isAdmin = false; currentUser = null; currentUserData = null; userRechte = {};
+  applyConfig();
+  zeigeSeite('auth-page');
+  updateBottomNav();
+}
+
+/* Back from wf-wild: if non-admin, go to start (they didn't come from wf-name) */
+function wfBackToName() {
+  if (!isAdmin && currentUserData && currentUserData.vorname) {
+    // Non-admin skipped wf-name, so "back" means abort
+    workflowAbort();
+  } else {
+    zeigeSeite('wf-name');
+  }
+}
+/* Back from wf-hirsch: in park mode, non-admin goes back to abort; admin goes to wf-name;
+   in revier mode goes to wf-wild */
+function wfBackFromHirsch() {
+  if (e.ist_park) {
+    if (!isAdmin && currentUserData && currentUserData.vorname) {
+      workflowAbort();
+    } else {
+      zeigeSeite('wf-name');
+    }
+  } else {
+    zeigeSeite('wf-wild');
+  }
+}
+
+/* ---------- User Management (Admin Tab) ---------- */
+async function loadUsersTab() {
+  const container = document.getElementById('usersListContainer');
+  if (!container) return;
+  container.innerHTML = '<p class="hint">Wird geladen...</p>';
+  try {
+    const users = await api.listUsers();
+    if (!Array.isArray(users) || !users.length) {
+      container.innerHTML = '<p class="hint">Keine Benutzer gefunden.</p>';
+      return;
+    }
+    let html = '<table class="user-table"><tr><th>Name</th><th>Username</th><th>E-Mail</th><th>Rechte</th><th>Aktiv</th></tr>';
+    users.forEach(u => {
+      const name = esc(((u.vorname||'') + ' ' + (u.nachname||'')).trim() || '–');
+      const rechte = u.rechte || {};
+      let badges = '';
+      if (rechte.revier) badges += '<span class="perm-badge perm-revier">Revier</span>';
+      if (rechte.park)   badges += '<span class="perm-badge perm-park">Park</span>';
+      if (rechte.admin)  badges += '<span class="perm-badge perm-admin">Admin</span>';
+      if (rechte.lesen)  badges += '<span class="perm-badge perm-lesen">Lesen</span>';
+      if (rechte.plan_revier || rechte.plan_park) badges += '<span class="perm-badge perm-plan">Plan</span>';
+      if (rechte.name_sichtbar) badges += '<span class="perm-badge perm-name">Name</span>';
+      if (rechte.name_verbergen) badges += '<span class="perm-badge perm-name" style="background:#9e9e9e;">Verborgen</span>';
+      const aktiv = (u.aktiv === false || u.aktiv === 0 || u.aktiv === '0')
+        ? '<span class="perm-badge perm-inactive">Inaktiv</span>'
+        : '<span style="color:var(--gruen);font-weight:bold;">Aktiv</span>';
+      html += '<tr onclick="openUserEditPopup(' + u.id + ')" style="cursor:pointer;">'
+        + '<td>' + name + '</td>'
+        + '<td>' + esc(u.username||'') + '</td>'
+        + '<td style="font-size:11px;">' + esc(u.email||'') + '</td>'
+        + '<td>' + (badges || '–') + '</td>'
+        + '<td>' + aktiv + '</td></tr>';
+    });
+    html += '</table>';
+    container.innerHTML = html;
+    // Store for popup usage
+    container._usersData = users;
+  } catch (err) {
+    container.innerHTML = '<p class="hint" style="color:var(--rot);">Fehler: ' + esc(err.message) + '</p>';
+  }
+}
+
+function openUserEditPopup(userId) {
+  const container = document.getElementById('usersListContainer');
+  const users = container && container._usersData;
+  if (!users) return;
+  const u = users.find(x => x.id === userId || Number(x.id) === Number(userId));
+  if (!u) { alert('Benutzer nicht gefunden.'); return; }
+  const rechte = u.rechte || {};
+
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;display:block;';
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:4%;right:4%;top:3vh;max-height:94vh;overflow-y:auto;background:#fff;padding:16px 18px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.4);z-index:1000;display:block;-webkit-overflow-scrolling:touch;';
+  ov.onclick = () => { ov.remove(); box.remove(); };
+  box.onclick = ev => ev.stopPropagation();
+
+  const isAktiv = !(u.aktiv === false || u.aktiv === 0 || u.aktiv === '0');
+
+  box.innerHTML = `
+    <h3>Benutzer bearbeiten</h3>
+    <div class="profile-section">
+      <h4>Profil</h4>
+      <div class="profile-info">
+        <div><span class="label">Vorname</span><br>${esc(u.vorname||'')}</div>
+        <div style="margin-top:4px;"><span class="label">Nachname</span><br>${esc(u.nachname||'')}</div>
+        <div style="margin-top:4px;"><span class="label">E-Mail</span><br>${esc(u.email||'')}</div>
+        <div style="margin-top:4px;"><span class="label">Telefon</span><br>${esc(u.telefon||'–')}</div>
+      </div>
+    </div>
+    <div class="profile-section">
+      <h4>Berechtigungen</h4>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="ue_revier" ${rechte.revier?'checked':''} style="width:auto;margin:0;"> Zugriff auf Revier
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="ue_park" ${rechte.park?'checked':''} style="width:auto;margin:0;"> Zugriff auf Park
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="ue_name_sichtbar" ${rechte.name_sichtbar?'checked':''} style="width:auto;margin:0;"
+           onchange="if(this.checked) document.getElementById('ue_name_verbergen').checked=false;"> Namen sichtbar
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="ue_name_verbergen" ${rechte.name_verbergen?'checked':''} style="width:auto;margin:0;"
+           onchange="if(this.checked) document.getElementById('ue_name_sichtbar').checked=false;"> Namen verbergen
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="ue_plan_revier" ${rechte.plan_revier?'checked':''} style="width:auto;margin:0;"> Plan bearbeiten Revier
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="ue_plan_park" ${rechte.plan_park?'checked':''} style="width:auto;margin:0;"> Plan bearbeiten Park
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="ue_lesen" ${rechte.lesen?'checked':''} style="width:auto;margin:0;"> Leserechte (sieht alle Namen)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+          <input type="checkbox" id="ue_admin" ${rechte.admin?'checked':''} style="width:auto;margin:0;"> Admin-Rechte
+        </label>
+      </div>
+    </div>
+    <div class="profile-section">
+      <h4>Status</h4>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:13px;">
+        <input type="checkbox" id="ue_aktiv" ${isAktiv?'checked':''} style="width:auto;margin:0;"> Aktiv (kann sich anmelden)
+      </label>
+    </div>
+    <div class="profile-section">
+      <h4>Passwort zurücksetzen</h4>
+      <div class="edit-row"><label>Neues Passwort</label><input id="ue_newpw" type="password" placeholder="Neues Passwort"></div>
+      <button class="sm" id="ue_resetpw_btn">Passwort zurücksetzen</button>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button id="ue_save_btn" style="flex:1;">💾 Speichern</button>
+      <button class="sec" id="ue_close_btn" style="flex:1;">Abbrechen</button>
+    </div>`;
+
+  box.querySelector('#ue_resetpw_btn').onclick = async () => {
+    const pw = document.getElementById('ue_newpw').value;
+    if (!pw || pw.length < 4) { alert('Passwort muss mind. 4 Zeichen haben.'); return; }
+    try {
+      await api.resetUserPw(u.id, pw);
+      document.getElementById('ue_newpw').value = '';
+      toast('Passwort zurückgesetzt');
+    } catch (err) { alert('Fehler: ' + err.message); }
+  };
+  box.querySelector('#ue_save_btn').onclick = async () => {
+    const data = {
+      recht_revier: document.getElementById('ue_revier').checked ? 1 : 0,
+      recht_park: document.getElementById('ue_park').checked ? 1 : 0,
+      recht_name_sichtbar: document.getElementById('ue_name_sichtbar').checked ? 1 : 0,
+      recht_name_verbergen: document.getElementById('ue_name_verbergen').checked ? 1 : 0,
+      recht_plan_revier: document.getElementById('ue_plan_revier').checked ? 1 : 0,
+      recht_plan_park: document.getElementById('ue_plan_park').checked ? 1 : 0,
+      recht_lesen: document.getElementById('ue_lesen').checked ? 1 : 0,
+      recht_admin: document.getElementById('ue_admin').checked ? 1 : 0,
+      aktiv: document.getElementById('ue_aktiv').checked ? 1 : 0,
+    };
+    try {
+      await api.updateUser(u.id, data);
+      toast('Benutzer gespeichert');
+      ov.remove(); box.remove();
+      loadUsersTab();
+    } catch (err) { alert('Speichern fehlgeschlagen: ' + err.message); }
+  };
+  box.querySelector('#ue_close_btn').onclick = () => { ov.remove(); box.remove(); };
+  document.body.appendChild(ov);
+  document.body.appendChild(box);
+}
+
 async function doLogin() {
   const u = document.getElementById("adminUser").value.trim();
   const p = document.getElementById("adminPass").value;
   document.getElementById("adminPass").value = "";
   try {
     const r = await api.login(u, p);
-    isAdmin = (r.rolle === 'admin');
-    currentUser = r.username;
+    applyUserData(r);
     applyConfig();
     zeigeSeite("admin");
     fillExportYears();
@@ -3943,14 +4329,14 @@ async function doLogin() {
 
 async function adminLogout() {
   try { await api.logout(); } catch (_) {}
-  isAdmin = false; currentUser = null;
-  applyConfig(); anzeigen();
+  isAdmin = false; currentUser = null; currentUserData = null; userRechte = {};
+  applyConfig();
+  zeigeSeite('auth-page');
+  updateBottomNav();
 }
 function adminToRevier() { applyConfig(); anzeigen(); zeigeSeite("revier"); }
 async function adminLogoutFull() {
-  try { await api.logout(); } catch (_) {}
-  isAdmin = false; currentUser = null;
-  applyConfig(); anzeigen(); zeigeSeite("start");
+  await doFullLogout();
 }
 
 async function saveConfig() {
@@ -4187,6 +4573,11 @@ function exportExcel() {
 /* ---------- Auto-Advance ---------- */
 document.getElementById("inputZeit").addEventListener("change", () => setTimeout(nextDatum, 300));
 document.getElementById("inputDatum").addEventListener("change", () => setTimeout(nextVerwendung, 300));
+
+/* Enter key on login/register forms */
+document.getElementById("authPass").addEventListener("keydown", ev => { if (ev.key === "Enter") doAuthLogin(); });
+document.getElementById("authUser").addEventListener("keydown", ev => { if (ev.key === "Enter") doAuthLogin(); });
+document.getElementById("regPass2").addEventListener("keydown", ev => { if (ev.key === "Enter") doRegister(); });
 
 /* ---------- Start ---------- */
 init().catch(err => {
