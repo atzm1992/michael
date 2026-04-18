@@ -55,11 +55,85 @@ if ($action === 'list_names') {
     foreach ($rows as $r) {
         $full = trim(($r['vorname'] ?? '') . ' ' . ($r['nachname'] ?? ''));
         $names[] = [
-            'id'   => (int) $r['id'],
-            'name' => $full ?: $r['username'],
+            'id'       => (int) $r['id'],
+            'vorname'  => $r['vorname'] ?? '',
+            'nachname' => $r['nachname'] ?? '',
+            'username' => $r['username'] ?? '',
+            'name'     => $full ?: $r['username'],
         ];
     }
     jsonOk($names);
+}
+
+/* ================= create: Neuen Benutzer anlegen (Admin) ================= */
+if ($action === 'create') {
+    requireAdmin();
+    $username = trim((string) ($in['username'] ?? ''));
+    $password = (string) ($in['password'] ?? '');
+    $vorname  = trim((string) ($in['vorname'] ?? ''));
+    $nachname = trim((string) ($in['nachname'] ?? ''));
+    $email    = trim((string) ($in['email'] ?? ''));
+    $telefon  = trim((string) ($in['telefon'] ?? ''));
+    $rechte   = is_array($in['rechte'] ?? null) ? $in['rechte'] : [];
+
+    if ($username === '' || strlen($username) < 3) jsonErr('Benutzername (min. 3 Zeichen) erforderlich');
+    if (strlen($password) < 6) jsonErr('Passwort mind. 6 Zeichen');
+    if ($vorname === '' || $nachname === '') jsonErr('Vor- und Nachname erforderlich');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonErr('Ungültige E-Mail-Adresse');
+    if ($telefon === '') jsonErr('Telefon erforderlich');
+
+    // Username-Kollision prüfen
+    $chk = $pdo->prepare('SELECT id FROM users WHERE username = :u LIMIT 1');
+    $chk->execute([':u' => $username]);
+    if ($chk->fetch()) jsonErr('Benutzername bereits vergeben');
+
+    $isAdminFlag = !empty($rechte['admin']);
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+    if (str_contains($ip, ',')) $ip = trim(explode(',', $ip)[0]);
+    $ip = substr($ip, 0, 45);
+
+    $sql = 'INSERT INTO users
+        (username, pass_hash, vorname, nachname, email, telefon, rolle, aktiv,
+         recht_revier, recht_park, recht_name_sichtbar, recht_name_verbergen,
+         recht_plan_revier, recht_plan_park, recht_lesen, recht_admin,
+         consent_at, consent_ip)
+        VALUES (:u, :h, :vn, :nn, :em, :tel, :rolle, 1,
+                :r_rev, :r_park, :r_ns, :r_nv, :r_plr, :r_plp, :r_les, :r_adm,
+                NOW(), :ip)';
+    $pdo->prepare($sql)->execute([
+        ':u'     => $username,
+        ':h'     => $hash,
+        ':vn'    => $vorname,
+        ':nn'    => $nachname,
+        ':em'    => $email,
+        ':tel'   => $telefon,
+        ':rolle' => $isAdminFlag ? 'admin' : 'jaeger',
+        ':r_rev' => !empty($rechte['revier']) ? 1 : 0,
+        ':r_park'=> !empty($rechte['park']) ? 1 : 0,
+        ':r_ns'  => !empty($rechte['name_sichtbar']) ? 1 : 0,
+        ':r_nv'  => !empty($rechte['name_verbergen']) ? 1 : 0,
+        ':r_plr' => !empty($rechte['plan_revier']) ? 1 : 0,
+        ':r_plp' => !empty($rechte['plan_park']) ? 1 : 0,
+        ':r_les' => !empty($rechte['lesen']) ? 1 : 0,
+        ':r_adm' => $isAdminFlag ? 1 : 0,
+        ':ip'    => $ip,
+    ]);
+    $newId = (int) $pdo->lastInsertId();
+    $row = $pdo->prepare('SELECT * FROM users WHERE id = :id');
+    $row->execute([':id' => $newId]);
+    $u = $row->fetch();
+    jsonOk([
+        'id'       => $newId,
+        'username' => $u['username'],
+        'vorname'  => $u['vorname'] ?? '',
+        'nachname' => $u['nachname'] ?? '',
+        'email'    => $u['email'] ?? '',
+        'telefon'  => $u['telefon'] ?? '',
+        'rolle'    => $u['rolle'],
+        'aktiv'    => 1,
+        'rechte'   => loadUserRechte($u),
+    ]);
 }
 
 /* ================= update: Rechte/Profil ändern ================= */

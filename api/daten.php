@@ -60,6 +60,23 @@ function entryIsLocked(array $entry): bool {
 }
 
 /**
+ * Prüft, ob der eingeloggte Benutzer der Ersteller des Eintrags ist.
+ * Admin ist immer berechtigt.
+ */
+function isOwnEntry(array $entry): bool {
+    if (isAdmin()) return true;
+    $myId = (int) ($_SESSION['uid'] ?? 0);
+    $creator = $entry['user_id'] !== null ? (int) $entry['user_id'] : null;
+    return $myId > 0 && $creator === $myId;
+}
+
+function requireOwnEntry(array $entry): void {
+    if (!isOwnEntry($entry)) {
+        jsonErr('Du kannst nur deine eigenen Einträge bearbeiten', 403);
+    }
+}
+
+/**
  * Maskiert den Namen basierend auf den Rechten des anfragenden Benutzers.
  */
 function maskNameForUser(array $entry, array $currentUser, array $userRechteMap): string {
@@ -144,6 +161,7 @@ if ($method === 'POST') {
         if (!$entry) jsonErr('Eintrag nicht gefunden', 404);
 
         if ($action === 'entnommen') {
+            requireOwnEntry($entry);
             if (entryIsLocked($entry) && !isAdmin()) {
                 jsonErr('Eintrag ist als gemeldet gesperrt', 403);
             }
@@ -157,6 +175,7 @@ if ($method === 'POST') {
         }
 
         if ($action === 'abfall') {
+            requireOwnEntry($entry);
             if (entryIsLocked($entry) && !isAdmin()) {
                 jsonErr('Eintrag ist als gemeldet gesperrt', 403);
             }
@@ -178,6 +197,7 @@ if ($method === 'POST') {
         }
 
         if ($action === 'gewicht') {
+            requireOwnEntry($entry);
             if (entryIsLocked($entry) && !isAdmin()) {
                 jsonErr('Eintrag ist als gemeldet gesperrt', 403);
             }
