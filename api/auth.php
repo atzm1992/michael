@@ -113,6 +113,8 @@ if ($action === 'register') {
     if ($nachname === '') jsonErr('Nachname erforderlich');
     if ($email === '') jsonErr('E-Mail erforderlich');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonErr('Ungültige E-Mail-Adresse');
+    if ($telefon === '') jsonErr('Telefon erforderlich');
+    if (!preg_match('/^[0-9 +()\/\-]{5,}$/', $telefon)) jsonErr('Ungültige Telefonnummer');
     if (!$consent) jsonErr('Zustimmung zur Datenschutzerklärung erforderlich');
 
     // Prüfen ob Username schon vergeben
