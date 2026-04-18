@@ -674,20 +674,28 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 .plan-edit input[type="text"] { margin: 0; padding: 4px 6px; min-width: 0; box-sizing: border-box; }
 .plan-edit input[type="checkbox"] { width: 18px; height: 18px; }
 
-/* Plan-Bearbeiter auf Mobile: vertikal stacked mit klaren Labels */
+/* Plan-Bearbeiter auf Mobile: Grid-Layout mit Plan/Extern nebeneinander */
 @media (max-width: 700px) {
-  .plan-edit, .plan-edit tbody, .plan-edit tr, .plan-edit td {
-    display: block; width: 100%; box-sizing: border-box;
-  }
+  .plan-edit, .plan-edit tbody { display: block; width: 100%; box-sizing: border-box; }
   .plan-edit thead, .plan-edit tr > th { display: none; }
   .plan-edit tr {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "check klasse del"
+      "plan  extern extern"
+      "match match  match";
+    gap: 8px;
     border: 1px solid #ccc;
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 10px;
     background: #fff;
+    align-items: start;
   }
-  .plan-edit td { padding: 3px 0; border: none; position: relative; }
+  .plan-edit td {
+    padding: 0; border: none; min-width: 0;
+  }
   .plan-edit td::before {
     content: attr(data-label);
     display: block;
@@ -696,15 +704,21 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     margin-bottom: 2px;
     font-weight: 500;
   }
-  /* Hardcoded inline widths der inputs überschreiben */
+  .plan-edit td.pe-check { grid-area: check; align-self: center; padding-top: 14px; }
+  .plan-edit td.pe-check::before { display: none; }
+  .plan-edit tr td:nth-child(2) { grid-area: klasse; }
+  .plan-edit tr td:nth-child(3) { grid-area: plan; }
+  .plan-edit tr td:nth-child(4) { grid-area: extern; }
+  .plan-edit tr td:nth-child(5) { grid-area: match; }
+  .plan-edit td.pe-del { grid-area: del; align-self: center; padding-top: 14px; }
+  .plan-edit td.pe-del::before { display: none; }
+  .plan-edit td.pe-del button {
+    padding: 4px 10px !important; margin: 0;
+    border-radius: 50%; line-height: 1;
+  }
   .plan-edit input[type="text"],
   .plan-edit input[type="number"] { width: 100% !important; max-width: 100%; }
-  .plan-edit input[type="checkbox"] { width: 18px !important; }
-  /* Checkbox und Lösch-Button kompakt nebeneinander */
-  .plan-edit td.pe-check { display: inline-block; width: auto; vertical-align: middle; margin-right: 10px; }
-  .plan-edit td.pe-check::before { display: none; }
-  .plan-edit td.pe-del { display: inline-block; width: auto; float: right; }
-  .plan-edit td.pe-del::before { display: none; }
+  .plan-edit input[type="checkbox"] { width: 20px !important; height: 20px; }
 }
 
 /* Meldeliste im Admin */
@@ -718,23 +732,28 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 .meld-table td:first-child { text-align: left; }
 .meld-table td:last-child { text-align: right; white-space: nowrap; }
 
-/* Meldungs-Liste auf Mobile: 2 Zeilen pro Eintrag */
+/* Meldungs-Liste auf Mobile: Label oben, Button + Status in einer Zeile */
 @media (max-width: 700px) {
-  .meld-table, .meld-table tbody, .meld-table tr, .meld-table td {
-    display: block; width: 100%; box-sizing: border-box;
-  }
+  .meld-table, .meld-table tbody { display: block; width: 100%; box-sizing: border-box; }
   .meld-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "label label"
+      "btn   status";
+    gap: 8px;
+    align-items: center;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 8px;
     background: #fff;
   }
-  .meld-table td { border: none; padding: 2px 0; white-space: normal; }
-  .meld-table td:first-child { font-weight: 500; font-size: 13px; }
-  .meld-table td:nth-child(2) { font-size: 12px; color: var(--grau); padding-bottom: 6px; }
-  .meld-table td:last-child { text-align: left; }
-  .meld-table td:last-child button { padding: 6px 14px; font-size: 13px; }
+  .meld-table td { border: none; padding: 0; white-space: normal; }
+  .meld-table td:first-child { grid-area: label; font-weight: 500; font-size: 13px; }
+  .meld-table td:nth-child(2) { grid-area: status; font-size: 12px; text-align: right; }
+  .meld-table td:last-child { grid-area: btn; text-align: left; }
+  .meld-table td:last-child button { padding: 6px 14px; font-size: 13px; margin: 0; }
 }
 
 /* Hilfe-Popup: kompakte Accordion-Struktur */
