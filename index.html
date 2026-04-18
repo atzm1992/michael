@@ -667,12 +667,42 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
   display: flex; justify-content: space-between; align-items: center;
   font-size: 14px;
 }
-.plan-edit { width: 100%; border-collapse: collapse; font-size: 12px; }
+.plan-edit { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
 .plan-edit th, .plan-edit td { padding: 3px 4px; border-bottom: 1px solid #e0e0e0; text-align: left; }
 .plan-edit th { background: var(--gruen); color: #fff; text-align: left; font-weight: 600; }
 .plan-edit input[type="number"],
-.plan-edit input[type="text"] { margin: 0; padding: 4px 6px; }
+.plan-edit input[type="text"] { margin: 0; padding: 4px 6px; width: 100%; min-width: 0; }
 .plan-edit input[type="checkbox"] { width: 18px; height: 18px; }
+
+/* Plan-Bearbeiter auf Mobile: Karten-Layout mit 2 Zeilen pro Eintrag */
+@media (max-width: 700px) {
+  .plan-edit, .plan-edit tr, .plan-edit td { display: block; }
+  .plan-edit thead, .plan-edit tr > th { display: none; }
+  .plan-edit tr {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    background: #fff;
+    display: grid;
+    grid-template-columns: auto 1fr 70px 70px auto;
+    grid-template-rows: auto auto;
+    gap: 6px 8px;
+    align-items: center;
+  }
+  .plan-edit td { padding: 0; border: none; }
+  /* Zeile 1: ✓, Klasse (füllt), Plan, Extern, ✕ */
+  .plan-edit td:nth-child(1) { grid-row: 1; grid-column: 1; }
+  .plan-edit td:nth-child(2) { grid-row: 1; grid-column: 2; }
+  .plan-edit td:nth-child(3) { grid-row: 1; grid-column: 3; }
+  .plan-edit td:nth-child(3)::before { content: "Plan: "; font-size: 11px; color: var(--grau); }
+  .plan-edit td:nth-child(4) { grid-row: 1; grid-column: 4; }
+  .plan-edit td:nth-child(4)::before { content: "Extern: "; font-size: 11px; color: var(--grau); }
+  .plan-edit td:nth-child(6) { grid-row: 1; grid-column: 5; }
+  /* Zeile 2: "Zählt als" über volle Breite */
+  .plan-edit td:nth-child(5) { grid-row: 2; grid-column: 1 / -1; }
+  .plan-edit td:nth-child(5)::before { content: "Zählt als: "; font-size: 11px; color: var(--grau); }
+}
 
 /* Meldeliste im Admin */
 .meld-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -683,6 +713,30 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 }
 .meld-table td:first-child { text-align: left; }
 .meld-table td:last-child { text-align: right; }
+
+/* Meldungs-Liste auf Mobile: 2 Zeilen pro Eintrag */
+@media (max-width: 700px) {
+  .meld-table, .meld-table tr, .meld-table td { display: block; }
+  .meld-table tr {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: #fff;
+  }
+  .meld-table td { border: none; padding: 2px 0; }
+  .meld-table td:first-child { font-weight: 500; }
+  .meld-table td:nth-child(2) {
+    display: inline-block;
+    margin-right: 10px;
+    font-size: 12px;
+  }
+  .meld-table td:last-child {
+    display: inline-block;
+    text-align: left;
+  }
+  .meld-table td:last-child button { padding: 4px 10px; font-size: 12px; }
+}
 
 /* Hilfe-Popup: kompakte Accordion-Struktur */
 .help-sections details.help-section {
