@@ -102,10 +102,16 @@ if ($method === 'GET') {
 
 /* ================= POST ================= */
 if ($method === 'POST') {
-    requireAdmin();
+    requireLogin();
     $in      = jsonInput();
-    $jahr    = (int) ($in['jahr'] ?? 0);
     $kontext = normalizeKontext($in['kontext'] ?? 'revier');
+    $canEdit = isAdmin()
+        || ($kontext === 'revier' && hasRecht('plan_revier'))
+        || ($kontext === 'park' && hasRecht('plan_park'));
+    if (!$canEdit) {
+        jsonErr('Keine Berechtigung zum Bearbeiten des Plans', 403);
+    }
+    $jahr    = (int) ($in['jahr'] ?? 0);
     $plan    = $in['plan'] ?? null;
     if ($jahr <= 0)       jsonErr('jahr fehlt');
     if (!is_array($plan)) jsonErr('plan fehlt');
