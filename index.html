@@ -674,24 +674,25 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
 .plan-edit input[type="text"] { margin: 0; padding: 4px 6px; min-width: 0; box-sizing: border-box; }
 .plan-edit input[type="checkbox"] { width: 18px; height: 18px; }
 
-/* Plan-Bearbeiter auf Mobile: Grid-Layout mit Plan/Extern nebeneinander */
+/* Plan-Bearbeiter auf Mobile: Klasse volle Breite, Plan/Extern schmal,
+   Lösch-Button rechts bei Plan/Extern */
 @media (max-width: 700px) {
   .plan-edit, .plan-edit tbody { display: block; width: 100%; box-sizing: border-box; }
   .plan-edit thead, .plan-edit tr > th { display: none; }
   .plan-edit tr {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 28px 80px 80px 1fr auto;
     grid-template-areas:
-      "check klasse del"
-      "plan  extern extern"
-      "match match  match";
-    gap: 8px;
+      "check klasse klasse klasse klasse"
+      ".     plan   extern .      del"
+      ".     match  match  match  match";
+    gap: 6px 8px;
     border: 1px solid #ccc;
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 10px;
     background: #fff;
-    align-items: start;
+    align-items: end;
   }
   .plan-edit td {
     padding: 0; border: none; min-width: 0;
@@ -704,17 +705,18 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
     margin-bottom: 2px;
     font-weight: 500;
   }
-  .plan-edit td.pe-check { grid-area: check; align-self: center; padding-top: 14px; }
+  .plan-edit td.pe-check { grid-area: check; align-self: end; padding-bottom: 4px; }
   .plan-edit td.pe-check::before { display: none; }
   .plan-edit tr td:nth-child(2) { grid-area: klasse; }
   .plan-edit tr td:nth-child(3) { grid-area: plan; }
   .plan-edit tr td:nth-child(4) { grid-area: extern; }
   .plan-edit tr td:nth-child(5) { grid-area: match; }
-  .plan-edit td.pe-del { grid-area: del; align-self: center; padding-top: 14px; }
+  .plan-edit td.pe-del { grid-area: del; align-self: end; padding-bottom: 0; }
   .plan-edit td.pe-del::before { display: none; }
   .plan-edit td.pe-del button {
-    padding: 4px 10px !important; margin: 0;
+    padding: 6px 10px !important; margin: 0;
     border-radius: 50%; line-height: 1;
+    width: 34px; height: 34px;
   }
   .plan-edit input[type="text"],
   .plan-edit input[type="number"] { width: 100% !important; max-width: 100%; }
