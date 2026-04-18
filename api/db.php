@@ -193,6 +193,8 @@ function ensureSchema(): void {
           recht_lesen         TINYINT(1) NOT NULL DEFAULT 0,
           recht_admin         TINYINT(1) NOT NULL DEFAULT 0,
           aktiv       TINYINT(1) NOT NULL DEFAULT 1,
+          consent_at  DATETIME NULL,
+          consent_ip  VARCHAR(45) NULL,
           created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
@@ -212,6 +214,8 @@ function ensureSchema(): void {
         "ALTER TABLE users ADD COLUMN recht_lesen TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN recht_admin TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN aktiv TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE users ADD COLUMN consent_at DATETIME NULL",
+        "ALTER TABLE users ADD COLUMN consent_ip VARCHAR(45) NULL",
     ];
     foreach ($userCols as $sql) {
         try { $pdo->exec($sql); } catch (PDOException $e) { /* exists */ }

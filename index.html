@@ -1063,6 +1063,16 @@ body.has-bottom-nav .container { padding-bottom: 90px; }
         <input id="regPass2" type="password" placeholder="Passwort wiederholen" autocomplete="new-password">
         <p class="field-hint">Passwort zur Bestätigung erneut eingeben</p>
       </div>
+      <div class="field-group consent-group">
+        <label style="display:flex;align-items:flex-start;gap:8px;font-weight:normal;cursor:pointer;">
+          <input id="regConsent" type="checkbox" style="width:auto;margin:3px 0 0 0;flex:0 0 auto;">
+          <span style="font-size:13px;line-height:1.4;">
+            Ich habe die
+            <a onclick="event.preventDefault();openDatenschutzPopup();" style="color:var(--gruen-d);text-decoration:underline;cursor:pointer;">Datenschutzerklärung und das Impressum</a>
+            gelesen und akzeptiere die Verarbeitung meiner Daten zu den dort genannten Zwecken (Art. 6 Abs. 1 lit. a und f DSGVO).
+          </span>
+        </label>
+      </div>
       <button class="full" onclick="doRegister()">Registrieren</button>
       <div class="login-toggle">
         Bereits ein Konto? <a onclick="showLoginForm()">Anmelden</a>
@@ -4193,8 +4203,15 @@ async function doRegister() {
     errEl.textContent = 'Passwörter stimmen nicht überein.';
     errEl.style.display = 'block'; return;
   }
+  const consent = document.getElementById('regConsent');
+  if (!consent || !consent.checked) {
+    errEl.textContent = 'Bitte die Datenschutzerklärung lesen und der Verarbeitung zustimmen.';
+    errEl.style.display = 'block';
+    if (consent) consent.focus();
+    return;
+  }
   try {
-    const r = await api.register({ vorname, nachname, email, telefon, username, password });
+    const r = await api.register({ vorname, nachname, email, telefon, username, password, consent: true });
     applyUserData(r);
     errEl.style.display = 'none';
     zeigeSeite('start');
@@ -4207,6 +4224,42 @@ async function doRegister() {
 }
 
 /* Profile popup for logged-in users */
+/* Datenschutz & Impressum als Popup zeigen (damit man es auch während
+   der Registrierung lesen kann, ohne die Seite zu verlassen). Klont
+   den Inhalt der impressum-Seite. */
+function openDatenschutzPopup() {
+  const src = document.getElementById('impressum');
+  if (!src) { alert('Impressum nicht verfügbar'); return; }
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1999;display:block;';
+  const box = document.createElement('div');
+  box.style.cssText =
+    'position:fixed;left:4%;right:4%;top:3vh;' +
+    'max-height:94vh;overflow-y:auto;' +
+    'background:#fff;padding:16px 18px;border-radius:12px;' +
+    'box-shadow:0 10px 40px rgba(0,0,0,0.4);' +
+    'z-index:2000;display:block;' +
+    '-webkit-overflow-scrolling:touch;';
+  ov.onclick = () => { ov.remove(); box.remove(); };
+  box.onclick = ev => ev.stopPropagation();
+  // Inhalte aus der Impressum-Seite klonen (ohne den "Zurück"-Button)
+  const clone = src.cloneNode(true);
+  // Entferne den "Zurück zur Startseite"-Button am Ende
+  clone.querySelectorAll('button').forEach(b => b.remove());
+  // Style so, dass der Klon inline angezeigt wird
+  clone.style.display = 'block';
+  clone.classList.remove('page');
+  box.appendChild(clone);
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'full';
+  closeBtn.style.cssText = 'margin-top:12px;';
+  closeBtn.textContent = 'Schließen';
+  closeBtn.onclick = () => { ov.remove(); box.remove(); };
+  box.appendChild(closeBtn);
+  document.body.appendChild(ov);
+  document.body.appendChild(box);
+}
+
 function openProfilePopup() {
   if (!currentUserData) return;
   const ov = document.createElement('div');
